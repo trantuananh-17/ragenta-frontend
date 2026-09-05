@@ -1,0 +1,72 @@
+# Quality gate for pull requests, and the same gate a release runs before it
+# builds anything.
+#
+# There is no test suite yet, so this is what stands between a broken commit and
+# main: the linter, the bundler, and the compiler.
+name: Check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  # Called by release.yml so a tag cannot ship code that would not pass a PR.
+  workflow_call:
+
+# A new push to the same branch makes the in-flight run pointless — cancel it
+# rather than pay for both.
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node before corepack: corepack ships with Node, so it does not exist on
+      # PATH until this step has run.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22" # matches Dockerfile's `FROM node:22-alpine`
+
+      # corepack activates the exact pnpm pinned by package.json#packageManager,
+      # so CI cannot silently resolve a different one than developers use.
+      - name: Enable corepack
+        run: corepack enable
+
+      # Ask pnpm where its store is rather than hardcoding a path — a wrong path
+      # caches an empty directory, which always misses while looking like it works.
+      - name: Locate the pnpm store
+        id: pnpm-store
+        run: echo "dir=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.dir }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        # --frozen-lockfile: fail rather than silently resolve a newer version.
+        run: pnpm install --frozen-lockfile
+
+      # Before the build, because it needs nothing generated and its rules —
+      # react-hooks/set-state-in-effect in particular — catch the class of bug
+      # that compiles cleanly and then flickers in the browser.
+      - name: Lint
+        run: pnpm lint
+
+      # Prerenders every route, so a section that throws only when rendered
+      # fails here rather than on the VM.
+      - name: Build
+        run: pnpm build
+
+      # After the build, not before: `next build` writes next-env.d.ts and
+      # .next/types, both of which tsconfig includes. Running tsc on a fresh
+      # checkout without them typechecks a different program than the one that
+      # ships.
+      - name: Typecheck
+        run: pnpm typecheck

@@ -1,0 +1,16 @@
+# pnpm 11 settings. These used to live under a "pnpm" key in package.json, which
+# pnpm 11 no longer reads at all — it warns and ignores it.
+
+# pnpm 11 blocks packages published <24h ago (minimumReleaseAge). We track fresh
+# Next.js releases, so exempt that ecosystem — same list as ragenta-landing-page.
+minimumReleaseAgeExclude:
+  - next
+  - "@next/*"
+  - eslint-config-next
+
+# pnpm refuses to install until every dependency with a postinstall script is
+# approved. `sharp` is what next/image optimises with; `unrs-resolver` is the
+# native module eslint-config-next resolves imports through.
+allowBuilds:
+  sharp: true
+  unrs-resolver: true
