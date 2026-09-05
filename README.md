@@ -172,6 +172,35 @@ so an answer that misses something is usually explained there.
 - **Conversation search, regenerate, title auto-generation.** The backend
   supports none of the three.
 
+## Deployment
+
+Live on staging at **https://staging-frontend.ragenta.cloud**, running
+`v0.1.0rc1`. The container listens on `127.0.0.1:8082`; `ragenta-deployment`
+carries the `app` service, the `IMAGE_TAG_APP_FRONTEND` pin and the nginx vhost.
+
+Releases are tags: `v1.2.0rc1` goes to staging, `v1.2.0` to production. The tag
+builds and pushes the image to GHCR, then deploys.
+
+**The deploy half is not wired yet.** This repository's `staging` GitHub
+Environment has `DEPLOY_PATH` but not `SSH_HOST` / `SSH_USER` / `SSH_KEY`, so
+`deploy-template.yml` publishes the image and then says it skipped. Until those
+three secrets exist, a release has to be finished by hand on the VM — the same
+four commands the workflow would have run:
+
+```bash
+cd /srv/ragenta-deployment/environments/staging
+( umask 077; grep -v '^IMAGE_TAG_APP_FRONTEND=' .env > .env.next )
+echo "IMAGE_TAG_APP_FRONTEND=v0.1.0rc1" >> .env.next && chmod 600 .env.next && mv .env.next .env
+docker compose pull app && docker compose up -d app
+```
+
+The nginx vhost gives `/api/v1/workspaces` its own location with
+`proxy_buffering off`, because chat answers stream token by token and the
+default would hold the whole answer until the end. It is matched with `^~` and
+no trailing slash on purpose: a `location /api/v1/workspaces/` makes nginx 301
+the bare collection path, and a 301 on a POST is re-issued as a GET — which
+would turn creating a workspace during onboarding into a silent no-op.
+
 ## Reference clone
 
 `vecura-frontend/` is a **read-only** reference (ADR-012), gitignored and
