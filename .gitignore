@@ -25,5 +25,3 @@ yarn-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Read-only reference clone (ADR-012). Never committed, never edited.
-/vecura-frontend/

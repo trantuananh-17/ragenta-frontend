@@ -201,14 +201,6 @@ no trailing slash on purpose: a `location /api/v1/workspaces/` makes nginx 301
 the bare collection path, and a 301 on a POST is re-issued as a GET — which
 would turn creating a workspace during onboarding into a silent no-op.
 
-## Reference clone
-
-`vecura-frontend/` is a **read-only** reference (ADR-012), gitignored and
-excluded from `tsconfig` and ESLint. The layout, the feature-module shape, the
-proxy and the sidebar's two-tab structure are cloned from it; nothing
-bio-specific (Mol\*, workflow canvas, tool specs, CopilotKit) came across,
-because Ragenta has no equivalent. Never edit or commit inside it.
-
 ## Scripts
 
 ```bash

@@ -10,8 +10,6 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Read-only reference clone (ADR-012). Never linted, never edited.
-    "vecura-frontend/**",
   ]),
 ]);
 
