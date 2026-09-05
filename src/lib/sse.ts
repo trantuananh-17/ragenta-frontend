@@ -14,6 +14,14 @@ export interface SseFrame {
   data: string;
 }
 
+/**
+ * Frames are separated by a blank line. Tolerant of `\r\n` as well as `\n`:
+ * the backend writes `\n`, but a reverse proxy that normalises line endings
+ * would otherwise leave every frame unterminated and the answer would arrive as
+ * nothing at all.
+ */
+const FRAME_SEPARATOR = /\r?\n\r?\n/;
+
 export async function* readSse(
   response: Response,
   signal?: AbortSignal,
@@ -32,18 +40,25 @@ export async function* readSse(
 
       buffer += value;
 
-      // Frames are separated by a blank line. A partial frame stays in the
-      // buffer until its terminator arrives — a chunk boundary lands mid-frame
-      // often enough that not doing this drops tokens.
-      let separator = buffer.indexOf("\n\n");
-      while (separator !== -1) {
-        const raw = buffer.slice(0, separator);
-        buffer = buffer.slice(separator + 2);
+      // A partial frame stays in the buffer until its terminator arrives — a
+      // chunk boundary lands mid-frame often enough that not doing this drops
+      // tokens.
+      let match = FRAME_SEPARATOR.exec(buffer);
+      while (match) {
+        const raw = buffer.slice(0, match.index);
+        buffer = buffer.slice(match.index + match[0].length);
         const frame = parseFrame(raw);
         if (frame) yield frame;
-        separator = buffer.indexOf("\n\n");
+        match = FRAME_SEPARATOR.exec(buffer);
       }
     }
+
+    // A last frame whose terminating blank line never arrived — the connection
+    // closed between the final `data:` and its `\n\n`. Dropping it would lose a
+    // whole frame, and if that frame is `done` the caller never learns the turn
+    // finished and the composer stays stuck in "answering".
+    const trailing = parseFrame(buffer);
+    if (trailing) yield trailing;
   } finally {
     reader.cancel().catch(() => {
       // The consumer stopped reading; the connection is already going away.
@@ -55,7 +70,7 @@ function parseFrame(raw: string): SseFrame | null {
   let event = "message";
   const data: string[] = [];
 
-  for (const line of raw.split("\n")) {
+  for (const line of raw.split(/\r?\n/)) {
     if (line.startsWith("event:")) event = line.slice(6).trim();
     else if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
   }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { api } from "@/lib/ky";
 import { pageSchema } from "@/lib/pagination";
 import { readSse } from "@/lib/sse";
+import { redirectToLogin, responseErrorMessage } from "@/lib/unauthorized";
 
 /**
  * One retrieved passage, frozen onto the answer that used it. The index is
@@ -179,16 +180,25 @@ export async function* streamMessage(
   );
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
-    } | null;
-    throw new Error(body?.error?.message ?? "The answer could not be started.");
+    // Outside the ky client, so the shared 401 handling has to be asked for.
+    if (response.status === 401) redirectToLogin();
+    throw new Error(
+      await responseErrorMessage(response, "The answer could not be started."),
+    );
   }
 
   for await (const frame of readSse(response, signal)) {
-    const parsed = streamEventSchema.safeParse(JSON.parse(frame.data));
-    // An unrecognised frame is skipped rather than thrown on: a future server
-    // event type must not break an older client mid-answer.
+    // Both the parse and the schema check are non-fatal. A frame truncated by a
+    // dropped connection, or an event type a later server adds, must not throw
+    // and discard an answer that is already half on screen.
+    let payload: unknown;
+    try {
+      payload = JSON.parse(frame.data);
+    } catch {
+      continue;
+    }
+
+    const parsed = streamEventSchema.safeParse(payload);
     if (parsed.success) yield parsed.data;
   }
 }

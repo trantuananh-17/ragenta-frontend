@@ -1,6 +1,7 @@
 import ky from "ky";
 
 import { RAGENTA_API_URL, forwardedCookie } from "./server-fetch";
+import { redirectToLogin } from "./unauthorized";
 
 /**
  * `ragenta-backend` — identity, workspaces, projects, knowledge bases, chat,
@@ -30,15 +31,10 @@ export const api = ky.create({
     ],
     afterResponse: [
       async (_request, _options, response) => {
-        // A session that expired mid-session leaves the browser on a page it can
-        // no longer load. Send it back to the gate rather than to an error card.
-        if (response.status === 401 && typeof window !== "undefined") {
-          const here = window.location.pathname + window.location.search;
-          window.location.href =
-            here.startsWith("/") && !here.startsWith("//") && here !== "/login"
-              ? `/login?redirect=${encodeURIComponent(here)}`
-              : "/login";
-        }
+        // A session that expired mid-session leaves the browser on a page it
+        // can no longer load. Send it back to the gate rather than to an error
+        // card — the same thing the two raw-fetch calls do.
+        if (response.status === 401) redirectToLogin();
         return response;
       },
     ],

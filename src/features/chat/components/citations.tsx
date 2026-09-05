@@ -1,6 +1,6 @@
 "use client";
 
-import { Children, Fragment, isValidElement, type ReactNode } from "react";
+import { Children, Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { FileText } from "lucide-react";
 
@@ -59,11 +59,59 @@ function CitationBadge({ citation }: { citation: Citation }) {
 }
 
 /**
+ * Splits one text run on its markers.
+ *
+ * The regex is constructed per call rather than shared: a `g` regex carries
+ * `lastIndex` as mutable state, and inline elements nest — a `<strong>` inside a
+ * paragraph runs this while the paragraph's own loop is still open, and a shared
+ * `lastIndex` would make the outer loop resume at the inner one's position and
+ * silently drop the rest of the sentence.
+ */
+function splitMarkers(
+  text: string,
+  citations: Citation[],
+  keyPrefix: string,
+): ReactNode {
+  const marker = new RegExp(MARKER.source, "g");
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+
+  for (let match = marker.exec(text); match; match = marker.exec(text)) {
+    if (match.index > cursor) parts.push(text.slice(cursor, match.index));
+
+    const citation = citations.find(
+      (candidate) => candidate.index === Number(match[1]),
+    );
+    // A marker with no passage behind it is dropped rather than shown: it would
+    // be a footnote pointing at nothing.
+    if (citation) {
+      parts.push(
+        <CitationBadge
+          key={`${keyPrefix}-${match.index}`}
+          citation={citation}
+        />,
+      );
+    }
+
+    cursor = match.index + match[0].length;
+  }
+
+  if (parts.length === 0) return text;
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return <Fragment key={keyPrefix}>{parts}</Fragment>;
+}
+
+/**
  * Replaces the markers inside already-rendered markdown children.
  *
  * Done on the rendered children rather than on the source text so the markdown
- * itself is never rewritten — substituting HTML into the source before parsing
+ * itself is never rewritten — substituting markup into the source before parsing
  * would mean an answer that happens to contain a bracket could inject markup.
+ *
+ * Only the direct text runs of the element that calls this are rewritten. A
+ * nested element is left alone here and applies this itself, through its own
+ * renderer in `chat-message.tsx` — which is what keeps a `[[1]]` inside a code
+ * span rendering as the literal text it is, rather than as a footnote.
  */
 export function withCitations(
   children: ReactNode,
@@ -71,37 +119,11 @@ export function withCitations(
 ): ReactNode {
   if (citations.length === 0) return children;
 
-  return Children.map(children, (child, childIndex) => {
-    if (typeof child !== "string") {
-      // Nested markdown elements are rendered by their own component, which
-      // applies this in turn — recursing here would double-wrap them.
-      return isValidElement(child) ? child : child;
-    }
-
-    const parts: ReactNode[] = [];
-    let cursor = 0;
-    let match: RegExpExecArray | null;
-    MARKER.lastIndex = 0;
-
-    while ((match = MARKER.exec(child)) !== null) {
-      if (match.index > cursor) parts.push(child.slice(cursor, match.index));
-      const citation = citations.find(
-        (candidate) => candidate.index === Number(match![1]),
-      );
-      // A marker with no passage behind it is dropped rather than shown: it
-      // would be a footnote pointing at nothing.
-      if (citation) {
-        parts.push(
-          <CitationBadge key={`${childIndex}-${match.index}`} citation={citation} />,
-        );
-      }
-      cursor = match.index + match[0].length;
-    }
-
-    if (parts.length === 0) return child;
-    if (cursor < child.length) parts.push(child.slice(cursor));
-    return <Fragment key={childIndex}>{parts}</Fragment>;
-  });
+  return Children.map(children, (child, childIndex) =>
+    typeof child === "string"
+      ? splitMarkers(child, citations, String(childIndex))
+      : child,
+  );
 }
 
 /** The full source list under an answer, collapsed until asked for. */
@@ -112,9 +134,7 @@ export function SourceList({ citations }: { citations: Citation[] }) {
     <Collapsible className="mt-3 text-xs">
       <CollapsibleTrigger className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground">
         <FileText className="size-3.5" />
-        {citations.length === 1
-          ? "1 source"
-          : `${citations.length} sources`}
+        {citations.length === 1 ? "1 source" : `${citations.length} sources`}
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-2 space-y-2">
         {citations.map((citation) => (

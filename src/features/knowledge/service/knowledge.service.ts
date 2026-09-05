@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { api, apiUrl } from "@/lib/ky";
 import { pageSchema } from "@/lib/pagination";
+import { redirectToLogin, responseErrorMessage } from "@/lib/unauthorized";
 
 /**
  * A knowledge base belongs to the workspace, not to a project (ADR-019), and its
@@ -186,10 +187,11 @@ export async function uploadDocument(
   );
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
-    } | null;
-    throw new Error(body?.error?.message ?? `Upload failed (${response.status}).`);
+    // Outside the ky client, so the shared 401 handling has to be asked for.
+    if (response.status === 401) redirectToLogin();
+    throw new Error(
+      await responseErrorMessage(response, `Upload failed (${response.status}).`),
+    );
   }
 
   return documentSchema.parse(await response.json());

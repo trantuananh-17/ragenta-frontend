@@ -54,13 +54,19 @@ function AnswerBody({
             </div>
           ),
           h1: ({ children }) => (
-            <h1 className="text-base font-semibold">{children}</h1>
+            <h1 className="text-base font-semibold">
+              {withCitations(children, citations)}
+            </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-sm font-semibold">{children}</h2>
+            <h2 className="text-sm font-semibold">
+              {withCitations(children, citations)}
+            </h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-sm font-medium">{children}</h3>
+            <h3 className="text-sm font-medium">
+              {withCitations(children, citations)}
+            </h3>
           ),
           code: ({ className, children }) =>
             className ? (
@@ -82,8 +88,22 @@ function AnswerBody({
               rel="noreferrer"
               className="text-primary underline underline-offset-2"
             >
-              {children}
+              {withCitations(children, citations)}
             </a>
+          ),
+          // Inline marks get their own renderers for one reason: a marker at the
+          // end of a bolded sentence is a direct child of `strong`, not of `p`,
+          // so without these it survives to the DOM as the literal "[[1]]".
+          strong: ({ children }) => (
+            <strong className="font-semibold">
+              {withCitations(children, citations)}
+            </strong>
+          ),
+          em: ({ children }) => <em>{withCitations(children, citations)}</em>,
+          del: ({ children }) => (
+            <del className="text-muted-foreground">
+              {withCitations(children, citations)}
+            </del>
           ),
           blockquote: ({ children }) => (
             <blockquote className="border-l-2 pl-3 text-muted-foreground">
