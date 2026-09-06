@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -183,13 +184,22 @@ const MODE_LABELS: Record<SearchMode, { name: string; hint: string }> = {
 export function RetrievalSettingsPicker({
   mode,
   topK,
+  groundedOnly,
+  refineFollowUps,
   onChange,
   disabled,
 }: {
   mode: SearchMode;
   /** Null inherits the knowledge base's own setting. */
   topK: number | null;
-  onChange: (settings: { mode?: SearchMode; topK?: number | null }) => void;
+  groundedOnly: boolean;
+  refineFollowUps: boolean;
+  onChange: (settings: {
+    mode?: SearchMode;
+    topK?: number | null;
+    groundedOnly?: boolean;
+    refineFollowUps?: boolean;
+  }) => void;
   disabled?: boolean;
 }) {
   return (
@@ -264,7 +274,54 @@ export function RetrievalSettingsPicker({
             turn, because every one of them goes into the prompt.
           </p>
         </div>
+
+        <div className="space-y-3 border-t pt-3">
+          <Toggle
+            id="grounded-only"
+            label="Answer only from the documents"
+            hint="On, a question the passages do not cover gets “that is not in these documents”. Off, the model may answer from what it knows and has to mark that part as ungrounded."
+            checked={groundedOnly}
+            onChange={(next) => onChange({ groundedOnly: next })}
+          />
+          <Toggle
+            id="refine-follow-ups"
+            label="Rewrite follow-up questions"
+            hint="“How much is that one?” carries its subject in the previous turn, so searching for it as typed finds nothing. Costs a small extra model call on every turn that has history."
+            checked={refineFollowUps}
+            onChange={(next) => onChange({ refineFollowUps: next })}
+          />
+        </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** One switch with the sentence that says what turning it off costs. */
+function Toggle({
+  id,
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  hint: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={onChange}
+        className="mt-0.5"
+      />
+      <Label htmlFor={id} className="cursor-pointer text-xs font-normal">
+        <span className="block font-medium">{label}</span>
+        <span className="block text-muted-foreground">{hint}</span>
+      </Label>
+    </div>
   );
 }

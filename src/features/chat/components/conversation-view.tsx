@@ -165,6 +165,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
               content={streaming.content}
               citations={streaming.citations}
               phase={streaming.phase}
+              searchedFor={streaming.searchedFor}
               grounded={conversation.data.knowledgeBaseId !== null}
               stopping={streaming.stopping}
             />
@@ -215,11 +216,17 @@ export function ConversationView({ conversationId }: { conversationId: string })
                 <RetrievalSettingsPicker
                   mode={conversation.data.searchMode as SearchMode}
                   topK={conversation.data.topK}
+                  groundedOnly={conversation.data.groundedOnly}
+                  refineFollowUps={conversation.data.refineFollowUps}
                   disabled={pending || !conversation.data.knowledgeBaseId}
-                  onChange={({ mode, topK }) =>
+                  onChange={({ mode, topK, groundedOnly, refineFollowUps }) =>
                     updateConversation.mutate({
                       ...(mode ? { searchMode: mode } : {}),
                       ...(topK !== undefined ? { topK } : {}),
+                      ...(groundedOnly !== undefined ? { groundedOnly } : {}),
+                      ...(refineFollowUps !== undefined
+                        ? { refineFollowUps }
+                        : {}),
                     })
                   }
                 />

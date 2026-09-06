@@ -78,7 +78,7 @@ export function DocumentUpload({
         if (!disabled) accept(event.dataTransfer.files);
       }}
       className={cn(
-        "rounded-lg border border-dashed bg-background p-6 text-center transition-colors",
+        "rounded-lg border border-dashed bg-background p-4 transition-colors",
         dragging && "border-primary bg-accent/40",
         disabled && "opacity-60",
       )}
@@ -96,61 +96,68 @@ export function DocumentUpload({
         }}
       />
 
-      <UploadCloud className="mx-auto size-6 text-muted-foreground" />
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <UploadCloud className="size-5 shrink-0 text-muted-foreground" />
 
-      {upload.isPending ? (
-        <div className="mt-2 space-y-1">
-          <p className="text-sm font-medium">Uploading {upload.uploading}</p>
-          <p className="text-xs text-muted-foreground">
-            {upload.remaining} left. Files go one at a time — each is a worker
-            job and an embedding bill.
-          </p>
+          {upload.isPending ? (
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">
+                Uploading {upload.uploading}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {upload.remaining} left. Files go one at a time — each is a
+                worker job and an embedding bill.
+              </p>
+            </div>
+          ) : (
+            <div className="min-w-0">
+              <p className="text-sm font-medium">
+                Drop files here, or{" "}
+                <Button
+                  variant="link"
+                  className="h-auto p-0 align-baseline"
+                  disabled={disabled}
+                  onClick={() => inputRef.current?.click()}
+                >
+                  browse
+                </Button>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                PDF, DOCX, TXT, Markdown, HTML, CSV, TSV, JSON or EML ·{" "}
+                {Math.floor(MAX_UPLOAD_BYTES / 1024 / 1024)} MB each · a scanned
+                PDF has no text layer and will fail, there is no OCR yet
+              </p>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="mt-2 space-y-1">
-          <p className="text-sm font-medium">
-            Drop files here, or{" "}
-            <Button
-              variant="link"
-              className="h-auto p-0 align-baseline"
-              disabled={disabled}
-              onClick={() => inputRef.current?.click()}
-            >
-              browse
-            </Button>
-          </p>
-          <p className="text-xs text-muted-foreground">
-            PDF, DOCX, TXT, Markdown, HTML, CSV, TSV, JSON or EML, up to{" "}
-            {Math.floor(MAX_UPLOAD_BYTES / 1024 / 1024)} MB each. A scanned PDF
-            has no text layer and will fail — there is no OCR yet.
-          </p>
-        </div>
-      )}
 
-      <div className="mx-auto mt-4 max-w-sm text-left">
-        <Label htmlFor="upload-parser" className="text-xs">
-          Chunking method for this batch
-        </Label>
         {/*
-          The knowledge base has a method of its own and this control looks like
+          The knowledge base has a chunking method of its own and this looks like
           a duplicate of it until you know why both exist: the method is really a
           property of the *document*, and the base only supplies the default. One
           base holds an FAQ and a price table, and they are not cut the same way.
+          Hence "this batch" in the label — per-batch, not per-file, because a
+          drop of thirty files is one kind of document.
         */}
-        <p className="mt-1 text-xs text-muted-foreground">
-          Applies to the files in this upload only. Leave it on the default to
-          use the knowledge base&rsquo;s method
-          {baseParserName ? ` (${baseParserName})` : ""}.
-        </p>
-        <div className="mt-1.5">
-          <ChunkingMethodPicker
-            id="upload-parser"
-            workspaceId={workspaceId}
-            value={parserId}
-            onChange={setParserId}
-            disabled={disabled || upload.isPending}
-            allowInherit
-          />
+        <div className="flex items-center gap-2 text-left">
+          <Label
+            htmlFor="upload-parser"
+            className="shrink-0 text-xs text-muted-foreground"
+            title={`Applies to the files in this upload only. The knowledge base default is ${baseParserName ?? "its own method"}.`}
+          >
+            Chunk this batch as
+          </Label>
+          <div className="w-52">
+            <ChunkingMethodPicker
+              id="upload-parser"
+              workspaceId={workspaceId}
+              value={parserId}
+              onChange={setParserId}
+              disabled={disabled || upload.isPending}
+              allowInherit
+            />
+          </div>
         </div>
       </div>
     </div>

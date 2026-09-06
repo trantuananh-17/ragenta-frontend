@@ -45,6 +45,10 @@ export const conversationSchema = z.object({
   vectorWeight: z.coerce.number().nullable().default(null),
   rerankProvider: z.string().nullable().default(null),
   rerankModel: z.string().nullable().default(null),
+  /** Answer only from retrieved passages. Meaningless without a knowledge base. */
+  groundedOnly: z.boolean().default(true),
+  /** Rewrite a follow-up into a standalone question before searching. */
+  refineFollowUps: z.boolean().default(true),
   createdBy: z.string().nullable(),
   createdAt: z.coerce.string(),
   updatedAt: z.coerce.string(),
@@ -110,6 +114,8 @@ export interface RetrievalSettings {
   similarityThreshold?: number | null;
   vectorWeight?: number | null;
   rerank?: { provider: string; model: string } | null;
+  groundedOnly?: boolean;
+  refineFollowUps?: boolean;
 }
 
 export interface CreateConversationInput extends RetrievalSettings {
@@ -184,6 +190,12 @@ function retrievalPayload(input: RetrievalSettings) {
       ? { vectorWeight: input.vectorWeight }
       : {}),
     ...(input.rerank !== undefined ? { rerank: input.rerank } : {}),
+    ...(input.groundedOnly !== undefined
+      ? { groundedOnly: input.groundedOnly }
+      : {}),
+    ...(input.refineFollowUps !== undefined
+      ? { refineFollowUps: input.refineFollowUps }
+      : {}),
   };
 }
 
@@ -211,6 +223,12 @@ export type ChatStreamEvent =
   | { type: "start"; messageId: string }
   /** Which part of the turn is running. Not progress — neither part knows. */
   | { type: "phase"; phase: "retrieving" | "generating" }
+  /**
+   * The standalone question retrieval actually searched for, sent only when the
+   * server rewrote a follow-up. Shown so a rewrite that misread the thread is
+   * visible to the one person who can tell.
+   */
+  | { type: "query"; question: string }
   | { type: "citations"; citations: Citation[] }
   | { type: "delta"; text: string }
   | {
@@ -229,6 +247,7 @@ const streamEventSchema = z.discriminatedUnion("type", [
     type: z.literal("phase"),
     phase: z.enum(["retrieving", "generating"]),
   }),
+  z.object({ type: z.literal("query"), question: z.string() }),
   z.object({ type: z.literal("citations"), citations: z.array(citationSchema) }),
   z.object({ type: z.literal("delta"), text: z.string() }),
   z.object({

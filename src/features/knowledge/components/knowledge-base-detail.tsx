@@ -15,7 +15,7 @@ import {
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DetailShell } from "@/components/detail-shell";
 import { PageHeader } from "@/components/page-header";
-import { StatCard, StatCardGrid } from "@/components/stat-card";
+import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -49,6 +49,35 @@ import { ACTIVE_DOCUMENT_STATUSES } from "../service/knowledge.service";
 import { DocumentProgress, DocumentStatusBadge } from "./document-status";
 import { DocumentUpload } from "./document-upload";
 import { KnowledgeBaseSettingsDialog } from "./knowledge-base-settings-dialog";
+
+/**
+ * One indexing setting.
+ *
+ * These were stat cards until there were five in a row: the two that are
+ * genuinely numbers were lost among three that are configuration, and a model id
+ * set at display size reads as a headline it is not. Truncated with the full
+ * value on hover, because `text-embedding-3-small` is longer than the column and
+ * wrapping it dragged the whole row taller.
+ */
+function Fact({
+  term,
+  value,
+  detail,
+}: {
+  term: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-muted-foreground">{term}</dt>
+      <dd className="truncate text-sm font-medium" title={value}>
+        {value}
+      </dd>
+      <dd className="mt-0.5 text-xs text-muted-foreground">{detail}</dd>
+    </div>
+  );
+}
 
 export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
   const { workspace } = useWorkspace();
@@ -107,7 +136,7 @@ export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
         }
       />
 
-      <StatCardGrid columns={5}>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Documents"
           value={formatNumber(base.data.documentCount)}
@@ -117,28 +146,34 @@ export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
           value={formatNumber(base.data.chunkCount)}
           hint="Retrievable passages"
         />
-        <StatCard
-          identifier
-          label="Embedding"
-          value={base.data.embeddingModel}
-          hint={`${base.data.embeddingProvider} · ${base.data.embeddingDimensions} dimensions, frozen`}
-        />
-        <StatCard
-          identifier
-          label="Chunking"
-          value={parserName}
-          hint={`${base.data.chunkTokenSize} tokens, ${base.data.chunkOverlapPercent}% overlap`}
-        />
-        <StatCard
-          label="Retrieval"
-          value={`${base.data.topK} passages`}
-          hint={
-            base.data.rerankModel
-              ? `Reranked with ${base.data.rerankModel}`
-              : `${Math.round(base.data.vectorWeight * 100)}% meaning, ${Math.round((1 - base.data.vectorWeight) * 100)}% wording`
-          }
-        />
-      </StatCardGrid>
+
+        <div className="rounded-lg border bg-background p-4 sm:col-span-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase">
+            How it is indexed
+          </p>
+          <dl className="mt-3 grid gap-4 sm:grid-cols-3">
+            <Fact
+              term="Embedding"
+              value={base.data.embeddingModel}
+              detail={`${base.data.embeddingProvider} · ${base.data.embeddingDimensions} dimensions · frozen`}
+            />
+            <Fact
+              term="Chunking"
+              value={parserName}
+              detail={`${base.data.chunkTokenSize} tokens · ${base.data.chunkOverlapPercent}% overlap`}
+            />
+            <Fact
+              term="Retrieval"
+              value={`Top ${base.data.topK} passages`}
+              detail={
+                base.data.rerankModel
+                  ? `Reranked with ${base.data.rerankModel}`
+                  : `${Math.round(base.data.vectorWeight * 100)}% meaning · ${Math.round((1 - base.data.vectorWeight) * 100)}% wording`
+              }
+            />
+          </dl>
+        </div>
+      </div>
 
       <DocumentUpload
         baseParserName={parserName}

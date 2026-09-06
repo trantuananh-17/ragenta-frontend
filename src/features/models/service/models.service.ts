@@ -15,7 +15,12 @@ export const catalogueModelSchema = z.object({
   model: z.string(),
   capability: z.enum(["chat", "embedding", "rerank"]),
   tier: z.string(),
-  contextWindow: z.number().nullable(),
+  /**
+   * Nullish, not nullable: only chat and rerank models have one, and a field
+   * that is merely decorative here must never be the reason the whole catalogue
+   * fails to parse and five screens lose their model pickers.
+   */
+  contextWindow: z.number().nullish().default(null),
   configured: z.boolean(),
   entitled: z.boolean(),
   selectable: z.boolean(),

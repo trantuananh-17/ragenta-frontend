@@ -119,6 +119,8 @@ export interface StreamingTurn {
    * exists and is the slow, silent part of a turn, so it is worth naming.
    */
   phase: "retrieving" | "generating";
+  /** The rewritten question retrieval used, when the server rewrote one. */
+  searchedFor: string | null;
   /** When the question was sent, for the elapsed counter while it runs. */
   startedAt: number;
   /** Set once the server has named the turn, which is what stopping addresses. */
@@ -214,6 +216,7 @@ export function useSendMessage(workspaceId: string, conversationId: string) {
         content: "",
         citations: [],
         phase: "retrieving",
+        searchedFor: null,
         startedAt: Date.now(),
         messageId: null,
         stopping: false,
@@ -249,6 +252,10 @@ export function useSendMessage(workspaceId: string, conversationId: string) {
           } else if (event.type === "phase") {
             setStreaming((current) =>
               current ? { ...current, phase: event.phase } : current,
+            );
+          } else if (event.type === "query") {
+            setStreaming((current) =>
+              current ? { ...current, searchedFor: event.question } : current,
             );
           } else if (event.type === "citations") {
             setStreaming((current) =>

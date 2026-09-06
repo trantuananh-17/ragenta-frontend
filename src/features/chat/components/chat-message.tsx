@@ -229,6 +229,7 @@ export function StreamingMessage({
   content,
   citations,
   phase,
+  searchedFor,
   grounded,
   stopping,
 }: {
@@ -236,6 +237,8 @@ export function StreamingMessage({
   citations: Citation[];
   /** What the server last said it was doing. */
   phase: "retrieving" | "generating";
+  /** The standalone question the server searched for, when it rewrote one. */
+  searchedFor?: string | null;
   /** Whether this thread searches anything, so "retrieving" can be named honestly. */
   grounded: boolean;
   /** The server has been asked to stop and the last tokens are still arriving. */
@@ -265,6 +268,18 @@ export function StreamingMessage({
           <span className="size-2 animate-pulse rounded-full bg-primary" />
           {label}
         </div>
+      )}
+
+      {/*
+        A rewritten question is shown, not hidden. The rewrite is what retrieval
+        actually searched for, and when it misreads the thread that is the only
+        explanation on offer for an answer about the wrong subject — the person
+        who asked is the only one able to notice.
+      */}
+      {searchedFor && (
+        <p className="text-xs text-muted-foreground">
+          Searched for: <span className="italic">{searchedFor}</span>
+        </p>
       )}
 
       {stopping && (
