@@ -1,0 +1,257 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
+import { toast } from "sonner";
+
+import { errorMessage } from "@/lib/api-error";
+import type { Citation } from "@/features/chat/service/chat.service";
+import { agentKeys, agentOptions } from "../options/agents.options";
+import {
+  createAgent,
+  deleteAgent,
+  publishAgentVersion,
+  stopAgentRun,
+  streamAgentRun,
+  updateAgent,
+  type AgentConfigInput,
+  type CreateAgentInput,
+  type RunAgentInput,
+  type UpdateAgentInput,
+} from "../service/agents.service";
+
+export function useAgentsSuspense(workspaceId: string) {
+  return useSuspenseQuery(agentOptions.list(workspaceId));
+}
+
+export function useAgentSuspense(workspaceId: string, agentId: string) {
+  return useSuspenseQuery(agentOptions.detail(workspaceId, agentId));
+}
+
+export function useAgentRunsSuspense(workspaceId: string, agentId: string) {
+  return useSuspenseQuery(agentOptions.runs(workspaceId, agentId));
+}
+
+export function useAgentRunSuspense(workspaceId: string, runId: string) {
+  return useSuspenseQuery(agentOptions.run(workspaceId, runId));
+}
+
+export function useAgentRunSteps(workspaceId: string, runId: string) {
+  return useQuery(agentOptions.steps(workspaceId, runId));
+}
+
+export function useAgentVersions(workspaceId: string, agentId: string) {
+  return useQuery(agentOptions.versions(workspaceId, agentId));
+}
+
+export function useCreateAgent(workspaceId: string) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: CreateAgentInput) => createAgent(workspaceId, input),
+    onSuccess: async (agent) => {
+      await queryClient.invalidateQueries({ queryKey: agentKeys.list(workspaceId) });
+      // Created as a draft, so the detail screen is where the next step —
+      // activating it — actually is.
+      router.push(`/agents/${agent.id}`);
+    },
+    onError: async (error) => {
+      toast.error("The agent could not be created", {
+        description: await errorMessage(error),
+      });
+    },
+  });
+}
+
+export function useUpdateAgent(workspaceId: string, agentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: UpdateAgentInput) => updateAgent(workspaceId, agentId, input),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: agentKeys.detail(workspaceId, agentId),
+        }),
+        queryClient.invalidateQueries({ queryKey: agentKeys.list(workspaceId) }),
+      ]);
+    },
+    onError: async (error) => {
+      toast.error("The agent could not be updated", {
+        description: await errorMessage(error),
+      });
+    },
+  });
+}
+
+/**
+ * Publishing writes a new immutable version and makes it current. Runs already
+ * in flight keep the version they started on, which is the whole reason the
+ * configuration is versioned rather than edited in place.
+ */
+export function usePublishVersion(workspaceId: string, agentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (config: AgentConfigInput) =>
+      publishAgentVersion(workspaceId, agentId, config),
+    onSuccess: async (version) => {
+      toast.success(`Version ${version.version} published`);
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: agentKeys.detail(workspaceId, agentId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: agentKeys.versions(workspaceId, agentId),
+        }),
+      ]);
+    },
+    onError: async (error) => {
+      toast.error("The version could not be published", {
+        description: await errorMessage(error),
+      });
+    },
+  });
+}
+
+export function useDeleteAgent(workspaceId: string) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (agentId: string) => deleteAgent(workspaceId, agentId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: agentKeys.list(workspaceId) });
+      router.push("/agents");
+    },
+    onError: async (error) => {
+      toast.error("The agent could not be deleted", {
+        description: await errorMessage(error),
+      });
+    },
+  });
+}
+
+/** What is on screen while a run is streaming, before any row exists for it. */
+export interface StreamingRun {
+  runId: string | null;
+  output: string;
+  citations: Citation[];
+  phase: "retrieving" | "generating";
+  warning: string | null;
+  stopping: boolean;
+}
+
+/**
+ * One run, streamed.
+ *
+ * The output accumulates in local state rather than in the query cache: a
+ * `setQueryData` per token would re-render every subscriber of the run list on
+ * every token. It reconciles once, when the stream finishes, by invalidating and
+ * letting the server's own row win — that row carries the credits and the steps,
+ * which the deltas do not.
+ */
+export function useRunAgent(workspaceId: string, agentId: string) {
+  const queryClient = useQueryClient();
+  const [streaming, setStreaming] = useState<StreamingRun | null>(null);
+  const [pending, setPending] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const runIdRef = useRef<string | null>(null);
+
+  /**
+   * Stop generating, without losing what is on screen. Asking the server is what
+   * lets the run end the ordinary way — the partial output is written, `done`
+   * arrives, and the reconcile below finds a real row. The abort stays as the
+   * fallback for a run that has not been named yet.
+   */
+  const stop = useCallback(() => {
+    const runId = runIdRef.current;
+    if (!runId) {
+      abortRef.current?.abort();
+      abortRef.current = null;
+      return;
+    }
+
+    setStreaming((current) => (current ? { ...current, stopping: true } : current));
+
+    void stopAgentRun(workspaceId, runId).catch(() => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    });
+  }, [workspaceId]);
+
+  const run = useCallback(
+    async (input: RunAgentInput) => {
+      if (pending) return;
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      runIdRef.current = null;
+      setPending(true);
+      setStreaming({
+        runId: null,
+        output: "",
+        citations: [],
+        phase: "retrieving",
+        warning: null,
+        stopping: false,
+      });
+
+      try {
+        for await (const event of streamAgentRun(
+          workspaceId,
+          agentId,
+          input,
+          controller.signal,
+        )) {
+          if (event.type === "start") {
+            runIdRef.current = event.runId;
+            setStreaming((current) =>
+              current ? { ...current, runId: event.runId } : current,
+            );
+          } else if (event.type === "phase") {
+            setStreaming((current) =>
+              current ? { ...current, phase: event.phase } : current,
+            );
+          } else if (event.type === "citations") {
+            setStreaming((current) =>
+              current ? { ...current, citations: event.citations } : current,
+            );
+          } else if (event.type === "warning") {
+            setStreaming((current) =>
+              current ? { ...current, warning: event.message } : current,
+            );
+          } else if (event.type === "delta") {
+            setStreaming((current) =>
+              current ? { ...current, output: current.output + event.text } : current,
+            );
+          } else if (event.type === "error") {
+            throw new Error(event.message);
+          }
+        }
+      } catch (error) {
+        // An abort is the user pressing stop, not a failure.
+        if (!controller.signal.aborted) {
+          toast.error("The run stopped", { description: await errorMessage(error) });
+        }
+      } finally {
+        abortRef.current = null;
+        runIdRef.current = null;
+        setPending(false);
+        await queryClient.invalidateQueries({
+          queryKey: agentKeys.runs(workspaceId, agentId),
+        });
+      }
+    },
+    [agentId, pending, queryClient, workspaceId],
+  );
+
+  return { run, stop, streaming, pending, clear: () => setStreaming(null) };
+}

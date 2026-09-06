@@ -15,8 +15,12 @@ import { SourceList, withCitations } from "./citations";
  * The renderers are explicit rather than inherited from a prose class so the
  * citation substitution can be applied at every place a marker can appear —
  * paragraphs, list items and table cells.
+ *
+ * Exported because an agent run produces the same thing a chat turn does — an
+ * answer carrying `[[n]]` markers over a frozen list of passages — and rendering
+ * it twice would let the two drift.
  */
-function AnswerBody({
+export function AnswerBody({
   content,
   citations,
 }: {

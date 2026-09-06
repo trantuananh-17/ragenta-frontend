@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   BookOpen,
+  Bot,
   CreditCard,
   FolderKanban,
   MessagesSquare,
@@ -43,6 +44,7 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { title: "Chat", icon: MessagesSquare, url: "/chat" },
+      { title: "Agents", icon: Bot, url: "/agents" },
       { title: "Knowledge", icon: BookOpen, url: "/knowledge" },
       { title: "Projects", icon: FolderKanban, url: "/projects" },
     ],
