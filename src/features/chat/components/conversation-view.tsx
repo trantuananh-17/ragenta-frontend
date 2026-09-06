@@ -66,7 +66,14 @@ export function ConversationView({ conversationId }: { conversationId: string })
   // created is on screen. Taking it clears it, so a reload does not re-ask.
   useEffect(() => {
     const question = takePendingQuestion(conversationId);
-    if (question) void send({ content: question });
+    if (!question) return;
+    // A model chosen before the thread existed belongs to this first turn, and
+    // stays selected afterwards so the next question runs on the same one.
+    if (question.model) setModel(question.model);
+    void send({
+      content: question.content,
+      model: question.model ?? undefined,
+    });
     // Runs once per conversation; `send` is stable per conversation id.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
@@ -139,13 +146,22 @@ export function ConversationView({ conversationId }: { conversationId: string })
         className="min-h-0 flex-1 overflow-y-auto"
       >
         <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-6">
-          {messages.data.items.map((message) => (
-            <ChatMessage key={message.id} message={message} />
-          ))}
+          {messages.data.items.map((message, index) => {
+            const previous = messages.data.items[index - 1];
+            return (
+              <ChatMessage
+                key={message.id}
+                message={message}
+                askedAt={previous?.role === "user" ? previous.createdAt : undefined}
+              />
+            );
+          })}
           {streaming && !streamedRowArrived && (
             <StreamingMessage
               content={streaming.content}
               citations={streaming.citations}
+              phase={streaming.phase}
+              grounded={conversation.data.knowledgeBaseId !== null}
               stopping={streaming.stopping}
             />
           )}

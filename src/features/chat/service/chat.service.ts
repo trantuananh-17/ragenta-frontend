@@ -209,6 +209,8 @@ export interface SendMessageInput {
 export type ChatStreamEvent =
   /** Arrives before any token. Its id is what the stop endpoint is addressed to. */
   | { type: "start"; messageId: string }
+  /** Which part of the turn is running. Not progress — neither part knows. */
+  | { type: "phase"; phase: "retrieving" | "generating" }
   | { type: "citations"; citations: Citation[] }
   | { type: "delta"; text: string }
   | {
@@ -223,6 +225,10 @@ export type ChatStreamEvent =
 
 const streamEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("start"), messageId: z.string() }),
+  z.object({
+    type: z.literal("phase"),
+    phase: z.enum(["retrieving", "generating"]),
+  }),
   z.object({ type: z.literal("citations"), citations: z.array(citationSchema) }),
   z.object({ type: z.literal("delta"), text: z.string() }),
   z.object({

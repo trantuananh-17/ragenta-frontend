@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import { AlertTriangle, CircleStop } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { formatCredits } from "@/lib/format";
+import { formatCredits, formatDateTime } from "@/lib/format";
 import type { Citation, Message } from "../service/chat.service";
 import { SourceList, withCitations } from "./citations";
 
@@ -118,6 +118,37 @@ function AnswerBody({
   );
 }
 
+/** Wall-clock only: the date is already in the hover title and on the day divider. */
+function clockTime(value: string): string {
+  return new Date(value).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * How long the answer took, to one decimal.
+ *
+ * Null when it cannot be known — the first message of a thread, or a pair whose
+ * order the list did not preserve. A wrong duration is worse than none: it would
+ * be read as the model being slow.
+ */
+function elapsedSeconds(answeredAt: string, askedAt?: string): number | null {
+  if (!askedAt) return null;
+  const ms = new Date(answeredAt).getTime() - new Date(askedAt).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  return Math.round(ms / 100) / 10;
+}
+
+function answerTitle(answeredAt: string, askedAt?: string): string {
+  const elapsed = elapsedSeconds(answeredAt, askedAt);
+  const asked = askedAt ? `Asked ${formatDateTime(askedAt)}
+` : "";
+  const took = elapsed === null ? "" : `
+Took ${elapsed}s`;
+  return `${asked}Answered ${formatDateTime(answeredAt)}${took}`;
+}
+
 /**
  * One turn.
  *
@@ -125,11 +156,25 @@ function AnswerBody({
  * left — an answer carrying citations, tables and code needs the room, and a
  * bubble around it only makes it narrower.
  */
-export function ChatMessage({ message }: { message: Message }) {
+export function ChatMessage({
+  message,
+  askedAt,
+}: {
+  message: Message;
+  /**
+   * When the question this answers was sent. Used only for the elapsed time in
+   * the hover title — the assistant row is written when the turn ends, so the
+   * gap between the two rows is how long the answer took.
+   */
+  askedAt?: string;
+}) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm whitespace-pre-wrap text-primary-foreground">
+        <div
+          title={`Sent ${formatDateTime(message.createdAt)}`}
+          className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm whitespace-pre-wrap text-primary-foreground"
+        >
           {message.content}
         </div>
       </div>
@@ -160,11 +205,21 @@ export function ChatMessage({ message }: { message: Message }) {
         </p>
       )}
 
-      {message.model && (
-        <p className="pt-1 text-[11px] text-muted-foreground tabular-nums">
-          {message.model} · {formatCredits(Math.round(message.credits))} credits
-        </p>
-      )}
+      <p
+        title={answerTitle(message.createdAt, askedAt)}
+        className="pt-1 text-[11px] text-muted-foreground tabular-nums"
+      >
+        {message.model && (
+          <>
+            {message.model} · {formatCredits(Math.round(message.credits))}{" "}
+            credits ·{" "}
+          </>
+        )}
+        <time dateTime={message.createdAt}>{clockTime(message.createdAt)}</time>
+        {elapsedSeconds(message.createdAt, askedAt) !== null && (
+          <> · {elapsedSeconds(message.createdAt, askedAt)}s</>
+        )}
+      </p>
     </div>
   );
 }
@@ -173,13 +228,34 @@ export function ChatMessage({ message }: { message: Message }) {
 export function StreamingMessage({
   content,
   citations,
+  phase,
+  grounded,
   stopping,
 }: {
   content: string;
   citations: Citation[];
+  /** What the server last said it was doing. */
+  phase: "retrieving" | "generating";
+  /** Whether this thread searches anything, so "retrieving" can be named honestly. */
+  grounded: boolean;
   /** The server has been asked to stop and the last tokens are still arriving. */
   stopping?: boolean;
 }) {
+  /*
+    Named phases rather than one spinner, because the two halves of a turn fail
+    and wait for different reasons: retrieval is a vector search and possibly a
+    reranker call that together take seconds on a large base, and until the first
+    token there is nothing else on screen to suggest anything is happening.
+  */
+  const label =
+    phase === "retrieving"
+      ? grounded
+        ? "Searching your documents..."
+        : "Preparing the question..."
+      : citations.length > 0
+        ? `Reading ${citations.length} passages...`
+        : "Writing the answer...";
+
   return (
     <div className="space-y-1">
       {content ? (
@@ -187,9 +263,7 @@ export function StreamingMessage({
       ) : (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span className="size-2 animate-pulse rounded-full bg-primary" />
-          {citations.length > 0
-            ? `Reading ${citations.length} passages...`
-            : "Searching your documents..."}
+          {label}
         </div>
       )}
 

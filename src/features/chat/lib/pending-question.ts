@@ -10,13 +10,24 @@
  * Reading takes the value, so a reload of the conversation URL does not re-ask
  * the question.
  */
-const pending = new Map<string, string>();
+export interface PendingQuestion {
+  content: string;
+  /** A model chosen on the blank slate applies to the turn it was chosen for. */
+  model: { provider: string; model: string } | null;
+}
 
-export function setPendingQuestion(conversationId: string, question: string) {
+const pending = new Map<string, PendingQuestion>();
+
+export function setPendingQuestion(
+  conversationId: string,
+  question: PendingQuestion,
+) {
   pending.set(conversationId, question);
 }
 
-export function takePendingQuestion(conversationId: string): string | undefined {
+export function takePendingQuestion(
+  conversationId: string,
+): PendingQuestion | undefined {
   const question = pending.get(conversationId);
   pending.delete(conversationId);
   return question;

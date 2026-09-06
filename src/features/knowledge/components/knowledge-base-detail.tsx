@@ -37,6 +37,7 @@ import { formatBytes, formatDateTime, formatNumber } from "@/lib/format";
 import { canAdminister, canContribute } from "@/lib/workspace";
 import {
   useCancelDocument,
+  useChunkingMethods,
   useDeleteDocument,
   useDeleteKnowledgeBase,
   useDocumentsSuspense,
@@ -53,6 +54,12 @@ export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
   const { workspace } = useWorkspace();
   const base = useKnowledgeBaseSuspense(workspace.id, baseId);
   const documents = useDocumentsSuspense(workspace.id, baseId);
+  // The registry already carries a human name for every strategy; a second
+  // label table here would be one more place to forget when one is added.
+  const chunkingMethods = useChunkingMethods(workspace.id);
+  const parserName =
+    chunkingMethods.data?.items.find((method) => method.id === base.data.parserId)
+      ?.name ?? base.data.parserId;
 
   const reindex = useReindexDocument(workspace.id);
   const cancel = useCancelDocument(workspace.id);
@@ -100,7 +107,7 @@ export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
         }
       />
 
-      <StatCardGrid>
+      <StatCardGrid columns={5}>
         <StatCard
           label="Documents"
           value={formatNumber(base.data.documentCount)}
@@ -111,13 +118,15 @@ export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
           hint="Retrievable passages"
         />
         <StatCard
+          identifier
           label="Embedding"
           value={base.data.embeddingModel}
           hint={`${base.data.embeddingProvider} · ${base.data.embeddingDimensions} dimensions, frozen`}
         />
         <StatCard
+          identifier
           label="Chunking"
-          value={base.data.parserId}
+          value={parserName}
           hint={`${base.data.chunkTokenSize} tokens, ${base.data.chunkOverlapPercent}% overlap`}
         />
         <StatCard
@@ -132,6 +141,7 @@ export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
       </StatCardGrid>
 
       <DocumentUpload
+        baseParserName={parserName}
         workspaceId={workspace.id}
         baseId={baseId}
         disabled={!mayContribute}

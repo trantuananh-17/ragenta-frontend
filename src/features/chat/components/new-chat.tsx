@@ -14,7 +14,8 @@ import {
 import { useCreateConversation } from "../hooks/chat.hook";
 import { setPendingQuestion } from "../lib/pending-question";
 import { ChatComposer } from "./chat-composer";
-import { KnowledgeBasePicker } from "./chat-pickers";
+import { KnowledgeBasePicker, ModelPicker } from "./chat-pickers";
+import type { ModelSelection } from "@/features/models/service/models.service";
 import { ProjectPicker } from "./retrieval-pickers";
 
 /**
@@ -31,6 +32,7 @@ export function NewChat() {
   const bases = useQuery(knowledgeOptions.bases(workspace.id));
   const [knowledgeBaseId, setKnowledgeBaseId] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [model, setModel] = useState<ModelSelection | null>(null);
 
   const mayChat = canContribute(workspace.role);
   const hasBases = (bases.data?.items.length ?? 0) > 0;
@@ -66,7 +68,7 @@ export function NewChat() {
               // Handed to the conversation screen, which sends it as soon as
               // it mounts.
               onSuccess: (conversation) =>
-                setPendingQuestion(conversation.id, content),
+                setPendingQuestion(conversation.id, { content, model }),
             },
           )
         }
@@ -80,6 +82,11 @@ export function NewChat() {
             <ProjectPicker
               value={projectId}
               onChange={setProjectId}
+              disabled={create.isPending}
+            />
+            <ModelPicker
+              value={model}
+              onChange={setModel}
               disabled={create.isPending}
             />
           </>

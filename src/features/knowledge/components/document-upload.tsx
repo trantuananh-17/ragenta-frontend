@@ -28,10 +28,13 @@ function tooLarge(file: File) {
 export function DocumentUpload({
   workspaceId,
   baseId,
+  baseParserName,
   disabled,
 }: {
   workspaceId: string;
   baseId: string;
+  /** The knowledge base's own method, named so "default" means something. */
+  baseParserName?: string;
   disabled?: boolean;
 }) {
   const upload = useUploadDocuments(workspaceId, baseId);
@@ -128,6 +131,17 @@ export function DocumentUpload({
         <Label htmlFor="upload-parser" className="text-xs">
           Chunking method for this batch
         </Label>
+        {/*
+          The knowledge base has a method of its own and this control looks like
+          a duplicate of it until you know why both exist: the method is really a
+          property of the *document*, and the base only supplies the default. One
+          base holds an FAQ and a price table, and they are not cut the same way.
+        */}
+        <p className="mt-1 text-xs text-muted-foreground">
+          Applies to the files in this upload only. Leave it on the default to
+          use the knowledge base&rsquo;s method
+          {baseParserName ? ` (${baseParserName})` : ""}.
+        </p>
         <div className="mt-1.5">
           <ChunkingMethodPicker
             id="upload-parser"

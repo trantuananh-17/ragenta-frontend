@@ -97,6 +97,17 @@ export function ModelPicker({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={NONE}>Workspace default</SelectItem>
+        {/*
+          An empty list is not the same as a broken picker, and without this it
+          looks like one: the only entry is "Workspace default" and nothing says
+          whether that is because the plan allows one model or because the
+          catalogue failed to load.
+        */}
+        {chatModels.length === 0 && (
+          <SelectItem value="__none__" disabled>
+            No other model is available on your plan
+          </SelectItem>
+        )}
         {chatModels.map((model) => (
           <SelectItem key={modelKey(model)} value={modelKey(model)}>
             {model.model}

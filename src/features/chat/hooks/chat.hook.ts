@@ -114,6 +114,13 @@ export function useDeleteConversation(workspaceId: string) {
 export interface StreamingTurn {
   content: string;
   citations: Citation[];
+  /**
+   * What the server said it was doing, last. Retrieval runs before a token
+   * exists and is the slow, silent part of a turn, so it is worth naming.
+   */
+  phase: "retrieving" | "generating";
+  /** When the question was sent, for the elapsed counter while it runs. */
+  startedAt: number;
   /** Set once the server has named the turn, which is what stopping addresses. */
   messageId: string | null;
   /** The user has asked it to stop and the last tokens are still arriving. */
@@ -206,6 +213,8 @@ export function useSendMessage(workspaceId: string, conversationId: string) {
       setStreaming({
         content: "",
         citations: [],
+        phase: "retrieving",
+        startedAt: Date.now(),
         messageId: null,
         stopping: false,
       });
@@ -236,6 +245,10 @@ export function useSendMessage(workspaceId: string, conversationId: string) {
             messageIdRef.current = event.messageId;
             setStreaming((current) =>
               current ? { ...current, messageId: event.messageId } : current,
+            );
+          } else if (event.type === "phase") {
+            setStreaming((current) =>
+              current ? { ...current, phase: event.phase } : current,
             );
           } else if (event.type === "citations") {
             setStreaming((current) =>
