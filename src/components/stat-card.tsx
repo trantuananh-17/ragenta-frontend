@@ -6,6 +6,15 @@ interface StatCardProps {
   hint?: React.ReactNode;
   icon?: React.ReactNode;
   className?: string;
+  /**
+   * The value is a name, not a number — a model id, a chunking method.
+   *
+   * Display type is for a figure read at a glance and is wrong for an
+   * identifier: `text-embedding-3-small` at `text-2xl` wraps onto two lines and
+   * drags the card taller than the ones beside it, and `tabular-nums` does
+   * nothing at all for a string.
+   */
+  identifier?: boolean;
 }
 
 /** One number and what it means. Used across the dashboard and the summaries. */
@@ -15,6 +24,7 @@ export function StatCard({
   hint,
   icon,
   className,
+  identifier,
 }: StatCardProps) {
   return (
     <div className={cn("rounded-lg border bg-background p-4", className)}>
@@ -24,14 +34,39 @@ export function StatCard({
         </p>
         {icon && <span className="text-muted-foreground">{icon}</span>}
       </div>
-      <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
+      <p
+        className={cn(
+          "mt-2 font-semibold",
+          identifier ? "text-base break-words" : "text-2xl tabular-nums",
+        )}
+      >
+        {value}
+      </p>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }
 
-export function StatCardGrid({ children }: { children: React.ReactNode }) {
+/**
+ * `columns` is the count at the widest breakpoint, and it is explicit because
+ * the right number follows the content: four narrow cards suit a dashboard of
+ * figures, three wider ones suit a summary that also carries names.
+ */
+export function StatCardGrid({
+  children,
+  columns = 4,
+}: {
+  children: React.ReactNode;
+  columns?: 3 | 4;
+}) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
+    <div
+      className={cn(
+        "grid gap-4 sm:grid-cols-2",
+        columns === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4",
+      )}
+    >
+      {children}
+    </div>
   );
 }
