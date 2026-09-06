@@ -33,6 +33,8 @@ export const topupPackSchema = z.object({
 
 export const planCatalogueSchema = z.object({
   signupGrantCredits: z.number(),
+  /** Defaulted so an older backend does not fail the whole price list. */
+  freeMonthlyCredits: z.number().default(0),
   plans: z.array(
     z.object({
       name: z.string(),
