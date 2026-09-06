@@ -29,6 +29,7 @@ import {
   modelKey,
   parseModelKey,
 } from "@/features/models/service/models.service";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { useCreateKnowledgeBase } from "../hooks/knowledge.hook";
 import { ChunkingMethodPicker } from "./chunking-method-picker";
@@ -117,6 +118,15 @@ export function CreateKnowledgeBaseDialog({
   // every render, which opts the whole component out of the React Compiler.
   const embedding = useWatch({ control, name: "embedding" });
   const parserId = useWatch({ control, name: "parserId" });
+
+  /**
+   * Nothing here can succeed without an embedding model, and the failure comes
+   * from the server after the form is filled in. Saying so up front, and
+   * refusing the submit, is the difference between "this product is broken" and
+   * "somebody has to store a key" — which is a distinction the person filling
+   * the form cannot otherwise make.
+   */
+  const blocked = catalogue.isSuccess && embeddingModels.length === 0;
   const raptor = useWatch({ control, name: "raptor" });
 
   return (
@@ -131,6 +141,18 @@ export function CreateKnowledgeBaseDialog({
             documents re-indexed after the change.
           </DialogDescription>
         </DialogHeader>
+
+        {blocked && (
+          <Alert variant="destructive">
+            <AlertTitle>No embedding model is configured</AlertTitle>
+            <AlertDescription>
+              A knowledge base has to embed its documents the moment it is
+              created, so this will be refused until an administrator stores a
+              provider key in the admin console. Every other field here is
+              filled in vain without one.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <form
           id="create-knowledge-base"
@@ -203,12 +225,6 @@ export function CreateKnowledgeBaseDialog({
                 ))}
               </SelectContent>
             </Select>
-            {embeddingModels.length === 0 && catalogue.isSuccess && (
-              <p className="text-xs text-muted-foreground">
-                No embedding model is configured on this deployment, so creation
-                will be refused. An administrator has to store a provider key.
-              </p>
-            )}
           </div>
 
           <div className="grid gap-2">
@@ -323,7 +339,7 @@ export function CreateKnowledgeBaseDialog({
           <Button
             type="submit"
             form="create-knowledge-base"
-            disabled={create.isPending}
+            disabled={create.isPending || blocked}
           >
             {create.isPending ? "Creating..." : "Create"}
           </Button>
