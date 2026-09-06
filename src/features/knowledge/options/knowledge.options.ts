@@ -1,9 +1,12 @@
 import { queryOptions } from "@tanstack/react-query";
 
 import {
+  ACTIVE_DOCUMENT_STATUSES,
+  getChunkingMethods,
   getChunks,
   getDocument,
   getDocuments,
+  getIngestionTasks,
   getKnowledgeBase,
   getKnowledgeBases,
   type KnowledgeDocument,
@@ -21,14 +24,18 @@ export const knowledgeKeys = {
     [...knowledgeKeys.all(), "document", workspaceId, documentId] as const,
   chunks: (workspaceId: string, documentId: string, page: number) =>
     [...knowledgeKeys.all(), "chunks", workspaceId, documentId, page] as const,
+  tasks: (workspaceId: string, documentId: string) =>
+    [...knowledgeKeys.all(), "tasks", workspaceId, documentId] as const,
+  chunkingMethods: (workspaceId: string) =>
+    [...knowledgeKeys.all(), "chunking-methods", workspaceId] as const,
 };
 
 /** Ingestion runs in a worker, so a document in flight is polled, not pushed. */
 const INGESTION_POLL_MS = 3_000;
 
 function stillIngesting(documents: KnowledgeDocument[]): boolean {
-  return documents.some(
-    (document) => document.status !== "ready" && document.status !== "failed",
+  return documents.some((document) =>
+    ACTIVE_DOCUMENT_STATUSES.includes(document.status),
   );
 }
 
@@ -62,6 +69,23 @@ export const knowledgeOptions = {
         query.state.data && stillIngesting([query.state.data])
           ? INGESTION_POLL_MS
           : false,
+    }),
+  /**
+   * The strategies the deployment offers. A property of the build, not of the
+   * workspace, so it is cached for the session rather than refetched per screen.
+   */
+  chunkingMethods: (workspaceId: string) =>
+    queryOptions({
+      queryKey: knowledgeKeys.chunkingMethods(workspaceId),
+      queryFn: () => getChunkingMethods(workspaceId),
+      staleTime: Number.POSITIVE_INFINITY,
+    }),
+  /** The ingestion plan. Polled alongside the document while it is still running. */
+  tasks: (workspaceId: string, documentId: string, active: boolean) =>
+    queryOptions({
+      queryKey: knowledgeKeys.tasks(workspaceId, documentId),
+      queryFn: () => getIngestionTasks(workspaceId, documentId),
+      refetchInterval: active ? INGESTION_POLL_MS : false,
     }),
   chunks: (workspaceId: string, documentId: string, page: number, limit = 20) =>
     queryOptions({

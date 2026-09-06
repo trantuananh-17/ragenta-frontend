@@ -24,6 +24,7 @@ export function ChatComposer({
   onSubmit,
   onStop,
   pending,
+  stopping,
   disabled,
   disabledReason,
   placeholder = "Ask a question about your documents...",
@@ -33,6 +34,8 @@ export function ChatComposer({
   onSubmit: (input: ComposerSubmit) => void;
   onStop?: () => void;
   pending?: boolean;
+  /** A stop is already in flight; the last tokens are still arriving. */
+  stopping?: boolean;
   disabled?: boolean;
   disabledReason?: string;
   placeholder?: string;
@@ -81,7 +84,8 @@ export function ChatComposer({
             size="icon-sm"
             variant="outline"
             onClick={onStop}
-            aria-label="Stop answering"
+            disabled={stopping}
+            aria-label={stopping ? "Stopping" : "Stop answering"}
           >
             <Square className="size-3.5" />
           </Button>

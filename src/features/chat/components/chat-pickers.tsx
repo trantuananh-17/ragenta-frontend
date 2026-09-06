@@ -17,7 +17,7 @@ import type { ModelSelection } from "@/features/models/service/models.service";
 import { useWorkspaceId } from "@/features/workspace/components/workspace-provider";
 
 /** The value the selects use for "nothing chosen" — Radix rejects an empty one. */
-const NONE = "__none__";
+export const NONE = "__none__";
 
 /**
  * Which knowledge base an answer is grounded in. "No retrieval" is a real

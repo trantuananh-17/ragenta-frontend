@@ -26,6 +26,33 @@ import type { Citation } from "../service/chat.service";
  */
 const MARKER = /\[\[(\d+)\]\]/g;
 
+/**
+ * Where a cited passage sits in its document, when that is knowable.
+ *
+ * A page number turns a citation into something a reader can go and check, which
+ * is the whole point of showing sources rather than asserting them.
+ */
+function citationLocation(citation: Citation): string | null {
+  if (citation.fromPage === null || citation.fromPage === undefined) return null;
+  return citation.toPage && citation.toPage !== citation.fromPage
+    ? `pages ${citation.fromPage}–${citation.toPage}`
+    : `page ${citation.fromPage}`;
+}
+
+/**
+ * A summary is text a model wrote over several passages, not something the
+ * document says. Labelling it is not a nicety: a citation that looks like a
+ * quotation and is not is the one way this feature can mislead.
+ */
+function SummaryNote({ kind }: { kind?: string }) {
+  if (kind !== "summary") return null;
+  return (
+    <p className="text-[10px] text-muted-foreground">
+      Model-written summary of several passages, not a quotation.
+    </p>
+  );
+}
+
 function CitationBadge({ citation }: { citation: Citation }) {
   return (
     <HoverCard>
@@ -50,8 +77,12 @@ function CitationBadge({ citation }: { citation: Citation }) {
         <p className="line-clamp-6 text-xs leading-relaxed text-muted-foreground">
           {citation.snippet}
         </p>
+        <SummaryNote kind={citation.kind} />
         <p className="text-[10px] text-muted-foreground tabular-nums">
           relevance {citation.score.toFixed(2)}
+          {citationLocation(citation) && (
+            <span className="ml-1">· {citationLocation(citation)}</span>
+          )}
         </p>
       </HoverCardContent>
     </HoverCard>
@@ -151,10 +182,16 @@ export function SourceList({ citations }: { citations: Citation[] }) {
                 {citation.index}
               </Badge>
               <span className="truncate">{citation.documentName}</span>
+              {citationLocation(citation) && (
+                <span className="shrink-0 font-normal text-muted-foreground tabular-nums">
+                  {citationLocation(citation)}
+                </span>
+              )}
             </p>
             <p className="mt-1.5 line-clamp-4 leading-relaxed text-muted-foreground">
               {citation.snippet}
             </p>
+            <SummaryNote kind={citation.kind} />
           </div>
         ))}
       </CollapsibleContent>

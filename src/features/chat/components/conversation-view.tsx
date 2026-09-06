@@ -26,6 +26,12 @@ import { takePendingQuestion } from "../lib/pending-question";
 import { ChatComposer } from "./chat-composer";
 import { ChatMessage, StreamingMessage } from "./chat-message";
 import { KnowledgeBasePicker, ModelPicker } from "./chat-pickers";
+import {
+  DocumentScopePicker,
+  ProjectPicker,
+  RetrievalSettingsPicker,
+} from "./retrieval-pickers";
+import type { SearchMode } from "../service/chat.service";
 
 /**
  * One thread.
@@ -47,6 +53,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
   );
 
   const [model, setModel] = useState<ModelSelection | null>(null);
+  // Which files this thread is currently scoped to. Kept in component state
+  // rather than on the conversation: it is a lens on the next question, not a
+  // property of the thread, and persisting it would silently narrow every later
+  // answer to whatever someone once ticked.
+  const [documentIds, setDocumentIds] = useState<string[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
@@ -69,6 +80,19 @@ export function ConversationView({ conversationId }: { conversationId: string })
   }, [messages.data.items.length, streaming?.content]);
 
   const mayChat = canContribute(workspace.role);
+
+  /**
+   * The streamed answer is dropped only once its saved row is on screen, and the
+   * two are never shown at the same time.
+   *
+   * Clearing the local copy the moment the stream ends would blank the answer
+   * for as long as the refetch takes; clearing it after would show the same text
+   * twice for a frame. Keying on the id the server sent at the start of the turn
+   * removes the ordering question entirely.
+   */
+  const streamedRowArrived =
+    streaming?.messageId != null &&
+    messages.data.items.some((message) => message.id === streaming.messageId);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -118,10 +142,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
           {messages.data.items.map((message) => (
             <ChatMessage key={message.id} message={message} />
           ))}
-          {streaming && (
+          {streaming && !streamedRowArrived && (
             <StreamingMessage
               content={streaming.content}
               citations={streaming.citations}
+              stopping={streaming.stopping}
             />
           )}
         </div>
@@ -132,19 +157,50 @@ export function ConversationView({ conversationId }: { conversationId: string })
           <ChatComposer
             autoFocus
             pending={pending}
+            stopping={streaming?.stopping}
             onStop={stop}
             disabled={!mayChat}
             disabledReason="Your role in this workspace can read but not spend its credits."
             onSubmit={({ content }) =>
-              void send({ content, model: model ?? undefined })
+              void send({
+                content,
+                model: model ?? undefined,
+                documentIds: documentIds.length > 0 ? documentIds : undefined,
+              })
             }
             toolbar={
               <>
                 <KnowledgeBasePicker
                   value={conversation.data.knowledgeBaseId}
                   disabled={pending}
-                  onChange={(knowledgeBaseId) =>
-                    updateConversation.mutate({ knowledgeBaseId })
+                  onChange={(knowledgeBaseId) => {
+                    // The scope belonged to the old base's documents; carrying
+                    // it over would filter the new base by ids it does not have,
+                    // which retrieves nothing and looks like a broken answer.
+                    setDocumentIds([]);
+                    updateConversation.mutate({ knowledgeBaseId });
+                  }}
+                />
+                <ProjectPicker
+                  value={conversation.data.projectId}
+                  disabled={pending}
+                  onChange={(projectId) => updateConversation.mutate({ projectId })}
+                />
+                <DocumentScopePicker
+                  knowledgeBaseId={conversation.data.knowledgeBaseId}
+                  value={documentIds}
+                  onChange={setDocumentIds}
+                  disabled={pending}
+                />
+                <RetrievalSettingsPicker
+                  mode={conversation.data.searchMode as SearchMode}
+                  topK={conversation.data.topK}
+                  disabled={pending || !conversation.data.knowledgeBaseId}
+                  onChange={({ mode, topK }) =>
+                    updateConversation.mutate({
+                      ...(mode ? { searchMode: mode } : {}),
+                      ...(topK !== undefined ? { topK } : {}),
+                    })
                   }
                 />
                 <ModelPicker value={model} onChange={setModel} disabled={pending} />

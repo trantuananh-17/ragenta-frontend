@@ -2,7 +2,7 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CircleStop } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { formatCredits } from "@/lib/format";
@@ -148,6 +148,18 @@ export function ChatMessage({ message }: { message: Message }) {
         </p>
       )}
 
+      {/*
+        A stopped answer is not a broken one — it is the length the reader asked
+        for — so it is a note, not a warning. Saying so matters: without it a
+        sentence that ends mid-clause looks like a bug in the product.
+      */}
+      {message.status === "stopped" && (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <CircleStop className="size-3.5" />
+          Stopped. What was generated is kept.
+        </p>
+      )}
+
       {message.model && (
         <p className="pt-1 text-[11px] text-muted-foreground tabular-nums">
           {message.model} · {formatCredits(Math.round(message.credits))} credits
@@ -161,9 +173,12 @@ export function ChatMessage({ message }: { message: Message }) {
 export function StreamingMessage({
   content,
   citations,
+  stopping,
 }: {
   content: string;
   citations: Citation[];
+  /** The server has been asked to stop and the last tokens are still arriving. */
+  stopping?: boolean;
 }) {
   return (
     <div className="space-y-1">
@@ -176,6 +191,13 @@ export function StreamingMessage({
             ? `Reading ${citations.length} passages...`
             : "Searching your documents..."}
         </div>
+      )}
+
+      {stopping && (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <CircleStop className="size-3.5" />
+          Stopping — keeping what has been written.
+        </p>
       )}
     </div>
   );

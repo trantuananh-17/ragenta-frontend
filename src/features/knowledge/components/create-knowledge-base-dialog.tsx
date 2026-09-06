@@ -29,7 +29,9 @@ import {
   modelKey,
   parseModelKey,
 } from "@/features/models/service/models.service";
+import { Switch } from "@/components/ui/switch";
 import { useCreateKnowledgeBase } from "../hooks/knowledge.hook";
+import { ChunkingMethodPicker } from "./chunking-method-picker";
 
 const WORKSPACE_DEFAULT = "__default__";
 
@@ -47,12 +49,33 @@ const schema = z.object({
     .int()
     .min(0)
     .max(50, "Beyond half, the overlap is most of the chunk."),
+  parserId: z.string(),
+  /**
+   * Both cost a model call per batch of passages at ingestion time, so they are
+   * off by default and the form says what they buy.
+   */
+  autoKeywords: z.coerce.number().int().min(0).max(10),
+  autoQuestions: z.coerce.number().int().min(0).max(5),
+  raptor: z.boolean(),
 });
 
+const DEFAULTS = {
+  name: "",
+  description: "",
+  embedding: WORKSPACE_DEFAULT,
+  chunkTokenSize: 512,
+  chunkOverlapPercent: 15,
+  parserId: "general",
+  autoKeywords: 0,
+  autoQuestions: 0,
+  raptor: false,
+} as const;
+
 /**
- * Creating a knowledge base is the one moment its embedding model and chunking
- * can be chosen — both are frozen on the row afterwards. That is stated on the
- * form rather than discovered later from a disabled field.
+ * Creating a knowledge base is the one moment its embedding model can be chosen
+ * — it is frozen on the row afterwards. The chunking settings are not frozen,
+ * but they only take effect on a re-index, and the form says both rather than
+ * leaving either to be discovered from a disabled field.
  */
 export function CreateKnowledgeBaseDialog({
   workspaceId,
@@ -76,28 +99,14 @@ export function CreateKnowledgeBaseDialog({
     formState: { errors },
   } = useForm<z.input<typeof schema>>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      name: "",
-      description: "",
-      embedding: WORKSPACE_DEFAULT,
-      chunkTokenSize: 512,
-      chunkOverlapPercent: 15,
-    },
+    defaultValues: { ...DEFAULTS },
   });
 
   // Cleared on open rather than in an effect, so the previous attempt is never
   // briefly on screen.
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) {
-      reset({
-        name: "",
-        description: "",
-        embedding: WORKSPACE_DEFAULT,
-        chunkTokenSize: 512,
-        chunkOverlapPercent: 15,
-      });
-    }
+    if (open) reset({ ...DEFAULTS });
   }
 
   const embeddingModels =
@@ -107,6 +116,8 @@ export function CreateKnowledgeBaseDialog({
   // `useWatch` rather than `watch()`: the latter returns a fresh function on
   // every render, which opts the whole component out of the React Compiler.
   const embedding = useWatch({ control, name: "embedding" });
+  const parserId = useWatch({ control, name: "parserId" });
+  const raptor = useWatch({ control, name: "raptor" });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -115,9 +126,9 @@ export function CreateKnowledgeBaseDialog({
           <DialogTitle>New knowledge base</DialogTitle>
           <DialogDescription>
             A set of documents that are retrieved together. The embedding model
-            and the chunking below are fixed once it exists — vectors from two
-            models are not comparable, so changing them later would mean
-            re-ingesting everything.
+            is fixed once it exists — vectors from two models are not comparable.
+            The chunking settings can be changed later, but they only apply to
+            documents re-indexed after the change.
           </DialogDescription>
         </DialogHeader>
 
@@ -136,6 +147,16 @@ export function CreateKnowledgeBaseDialog({
                     : (parseModelKey(parsed.embedding) ?? undefined),
                 chunkTokenSize: parsed.chunkTokenSize,
                 chunkOverlapPercent: parsed.chunkOverlapPercent,
+                parserId: parsed.parserId,
+                parserConfig: {
+                  ...(parsed.autoKeywords > 0
+                    ? { autoKeywords: parsed.autoKeywords }
+                    : {}),
+                  ...(parsed.autoQuestions > 0
+                    ? { autoQuestions: parsed.autoQuestions }
+                    : {}),
+                  ...(parsed.raptor ? { raptor: { enabled: true } } : {}),
+                },
               },
               { onSuccess: () => onOpenChange(false) },
             );
@@ -190,6 +211,16 @@ export function CreateKnowledgeBaseDialog({
             )}
           </div>
 
+          <div className="grid gap-2">
+            <Label htmlFor="parserId">Chunking method</Label>
+            <ChunkingMethodPicker
+              id="parserId"
+              workspaceId={workspaceId}
+              value={parserId}
+              onChange={(value) => setValue("parserId", value)}
+            />
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="chunkTokenSize">Chunk size (tokens)</Label>
@@ -220,8 +251,64 @@ export function CreateKnowledgeBaseDialog({
           </div>
           <p className="text-xs text-muted-foreground">
             512 tokens with 15% overlap suits prose. Shorter chunks retrieve more
-            precisely; longer ones keep more context around each answer.
+            precisely; longer ones keep more context around each answer. The
+            Q&amp;A, Table, One and Presentation methods ignore these — their
+            boundaries come from the document.
           </p>
+
+          <div className="space-y-4 rounded-lg border p-4">
+            <div>
+              <h3 className="text-sm font-medium">Indexing extras</h3>
+              <p className="text-xs text-muted-foreground">
+                Each one runs a model over your documents while they are indexed,
+                so each one costs credits once and makes retrieval better every
+                time afterwards. All three are off by default.
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="autoKeywords">Keywords per passage</Label>
+                <Input
+                  id="autoKeywords"
+                  type="number"
+                  {...register("autoKeywords")}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Synonyms and product names the passage never uses, so a search
+                  for them still finds it. 0 disables it.
+                </p>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="autoQuestions">Questions per passage</Label>
+                <Input
+                  id="autoQuestions"
+                  type="number"
+                  {...register("autoQuestions")}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Questions the passage answers, indexed beside it — a question
+                  matches another question better than it matches prose.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="raptor">Summary tree</Label>
+                <p className="text-xs text-muted-foreground">
+                  Groups related passages and indexes a model-written summary of
+                  each group, so &ldquo;what does this document say overall&rdquo;
+                  matches something. Answers cite summaries as summaries.
+                </p>
+              </div>
+              <Switch
+                id="raptor"
+                checked={raptor === true}
+                onCheckedChange={(checked) => setValue("raptor", checked)}
+              />
+            </div>
+          </div>
         </form>
 
         <DialogFooter>

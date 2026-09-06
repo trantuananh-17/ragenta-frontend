@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
@@ -12,6 +13,8 @@ import { toast } from "sonner";
 import { errorMessage } from "@/lib/api-error";
 import { knowledgeKeys, knowledgeOptions } from "../options/knowledge.options";
 import {
+  ACTIVE_DOCUMENT_STATUSES,
+  cancelDocument,
   createKnowledgeBase,
   deleteDocument,
   deleteKnowledgeBase,
@@ -20,6 +23,8 @@ import {
   updateKnowledgeBase,
   uploadDocument,
   type CreateKnowledgeBaseInput,
+  type ParserConfig,
+  type UpdateKnowledgeBaseInput,
 } from "../service/knowledge.service";
 
 export function useKnowledgeBasesSuspense(workspaceId: string) {
@@ -36,6 +41,26 @@ export function useDocumentsSuspense(workspaceId: string, baseId: string) {
 
 export function useDocumentSuspense(workspaceId: string, documentId: string) {
   return useSuspenseQuery(knowledgeOptions.document(workspaceId, documentId));
+}
+
+/** The chunking strategies this deployment can run. */
+export function useChunkingMethods(workspaceId: string) {
+  return useQuery(knowledgeOptions.chunkingMethods(workspaceId));
+}
+
+/** The ingestion plan for a document — one row per page range. */
+export function useIngestionTasks(
+  workspaceId: string,
+  documentId: string,
+  status: string,
+) {
+  return useQuery(
+    knowledgeOptions.tasks(
+      workspaceId,
+      documentId,
+      ACTIVE_DOCUMENT_STATUSES.includes(status),
+    ),
+  );
 }
 
 export function useChunksSuspense(
@@ -72,7 +97,7 @@ export function useUpdateKnowledgeBase(workspaceId: string, baseId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: { name?: string; description?: string | null }) =>
+    mutationFn: (input: UpdateKnowledgeBaseInput) =>
       updateKnowledgeBase(workspaceId, baseId, input),
     onSuccess: (base) => {
       toast.success("Knowledge base updated.");
@@ -120,14 +145,21 @@ export function useUploadDocuments(workspaceId: string, baseId: string) {
   const [remaining, setRemaining] = useState(0);
 
   const mutation = useMutation({
-    mutationFn: async (files: File[]) => {
+    mutationFn: async ({
+      files,
+      parserId,
+    }: {
+      files: File[];
+      /** Overrides the base's chunking method for this batch only. */
+      parserId?: string;
+    }) => {
       let succeeded = 0;
       setRemaining(files.length);
 
       for (const file of files) {
         setUploading(file.name);
         try {
-          await uploadDocument(workspaceId, baseId, file);
+          await uploadDocument(workspaceId, baseId, file, { parserId });
           succeeded += 1;
         } catch (error) {
           toast.error(`${file.name} was not accepted`, {
@@ -159,15 +191,48 @@ export function useReindexDocument(workspaceId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (documentId: string) => reindexDocument(workspaceId, documentId),
+    mutationFn: ({
+      documentId,
+      ...input
+    }: {
+      documentId: string;
+      parserId?: string | null;
+      parserConfig?: ParserConfig | null;
+    }) => reindexDocument(workspaceId, documentId, input),
     onSuccess: () => {
       toast.success("Re-indexing", {
-        description: "Every stage replaces what it produced, so this converges.",
+        description:
+          "Only the parts whose settings changed are re-embedded — the rest are reused.",
       });
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.all() });
     },
     onError: async (error) => {
       toast.error("Could not re-index", {
+        description: await errorMessage(error),
+      });
+    },
+  });
+}
+
+/**
+ * Stop an ingestion that is under way. The worker honours it between stages, so
+ * the badge keeps moving for a moment after the click — a provider call already
+ * in flight is finished rather than abandoned, because it has been paid for.
+ */
+export function useCancelDocument(workspaceId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (documentId: string) => cancelDocument(workspaceId, documentId),
+    onSuccess: () => {
+      toast.success("Stopping", {
+        description:
+          "The worker stops after the current step. Passages already indexed are kept.",
+      });
+      queryClient.invalidateQueries({ queryKey: knowledgeKeys.all() });
+    },
+    onError: async (error) => {
+      toast.error("Could not stop it", {
         description: await errorMessage(error),
       });
     },

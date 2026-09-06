@@ -15,12 +15,14 @@ import { chatKeys, chatOptions } from "../options/chat.options";
 import {
   createConversation,
   deleteConversation,
+  stopMessage,
   streamMessage,
   updateConversation,
   type Citation,
   type CreateConversationInput,
   type Message,
   type SendMessageInput,
+  type UpdateConversationInput,
 } from "../service/chat.service";
 
 export function useConversationsSuspense(workspaceId: string) {
@@ -69,7 +71,7 @@ export function useUpdateConversation(
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: { title?: string; knowledgeBaseId?: string | null }) =>
+    mutationFn: (input: UpdateConversationInput) =>
       updateConversation(workspaceId, conversationId, input),
     onSuccess: (conversation) => {
       queryClient.setQueryData(
@@ -112,6 +114,10 @@ export function useDeleteConversation(workspaceId: string) {
 export interface StreamingTurn {
   content: string;
   citations: Citation[];
+  /** Set once the server has named the turn, which is what stopping addresses. */
+  messageId: string | null;
+  /** The user has asked it to stop and the last tokens are still arriving. */
+  stopping: boolean;
 }
 
 function localMessage(
@@ -156,11 +162,38 @@ export function useSendMessage(workspaceId: string, conversationId: string) {
   const [streaming, setStreaming] = useState<StreamingTurn | null>(null);
   const [pending, setPending] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const messageIdRef = useRef<string | null>(null);
 
+  /**
+   * Stop generating, without losing what is on screen.
+   *
+   * Aborting the fetch is the obvious implementation and it is the wrong one:
+   * it kills the connection at the instant the server is trying to save the
+   * partial answer, so whether the text survives depends on a race between a
+   * database write and a fresh HTTP request. Asking the server to stop instead
+   * means the turn ends the ordinary way — the partial answer is written, `done`
+   * arrives, and the reconcile below finds a real row.
+   *
+   * The abort is kept as the fallback for the case the request itself fails, and
+   * for a closed tab, where the server has its own recovery.
+   */
   const stop = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-  }, []);
+    const messageId = messageIdRef.current;
+    if (!messageId) {
+      // No id yet: the answer has not been named, so there is nothing on screen
+      // worth preserving and the blunt instrument is the only one available.
+      abortRef.current?.abort();
+      abortRef.current = null;
+      return;
+    }
+
+    setStreaming((current) => (current ? { ...current, stopping: true } : current));
+
+    void stopMessage(workspaceId, conversationId, messageId).catch(() => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    });
+  }, [conversationId, workspaceId]);
 
   const send = useCallback(
     async (input: SendMessageInput) => {
@@ -168,8 +201,14 @@ export function useSendMessage(workspaceId: string, conversationId: string) {
 
       const controller = new AbortController();
       abortRef.current = controller;
+      messageIdRef.current = null;
       setPending(true);
-      setStreaming({ content: "", citations: [] });
+      setStreaming({
+        content: "",
+        citations: [],
+        messageId: null,
+        stopping: false,
+      });
 
       queryClient.setQueryData(
         chatKeys.messages(workspaceId, conversationId),
@@ -193,7 +232,12 @@ export function useSendMessage(workspaceId: string, conversationId: string) {
           input,
           controller.signal,
         )) {
-          if (event.type === "citations") {
+          if (event.type === "start") {
+            messageIdRef.current = event.messageId;
+            setStreaming((current) =>
+              current ? { ...current, messageId: event.messageId } : current,
+            );
+          } else if (event.type === "citations") {
             setStreaming((current) =>
               current ? { ...current, citations: event.citations } : current,
             );
@@ -216,13 +260,16 @@ export function useSendMessage(workspaceId: string, conversationId: string) {
         }
       } finally {
         abortRef.current = null;
+        messageIdRef.current = null;
         setPending(false);
-        setStreaming(null);
         // The server's rows are the truth: they carry the citations, the model
-        // and what the turn cost.
+        // and what the turn cost. Awaited *before* the local copy is dropped —
+        // clearing first would blank the answer for however long the refetch
+        // takes, which on a slow connection is long enough to read as a bug.
         await queryClient.invalidateQueries({
           queryKey: chatKeys.messages(workspaceId, conversationId),
         });
+        setStreaming(null);
         queryClient.invalidateQueries({
           queryKey: chatKeys.conversations(workspaceId),
         });

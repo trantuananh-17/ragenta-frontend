@@ -15,6 +15,7 @@ import { useCreateConversation } from "../hooks/chat.hook";
 import { setPendingQuestion } from "../lib/pending-question";
 import { ChatComposer } from "./chat-composer";
 import { KnowledgeBasePicker } from "./chat-pickers";
+import { ProjectPicker } from "./retrieval-pickers";
 
 /**
  * The blank slate.
@@ -29,6 +30,7 @@ export function NewChat() {
   const create = useCreateConversation(workspace.id);
   const bases = useQuery(knowledgeOptions.bases(workspace.id));
   const [knowledgeBaseId, setKnowledgeBaseId] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
 
   const mayChat = canContribute(workspace.role);
   const hasBases = (bases.data?.items.length ?? 0) > 0;
@@ -58,6 +60,7 @@ export function NewChat() {
               // of questions rather than a list of "New conversation".
               title: content.slice(0, 80),
               knowledgeBaseId,
+              projectId,
             },
             {
               // Handed to the conversation screen, which sends it as soon as
@@ -68,11 +71,18 @@ export function NewChat() {
           )
         }
         toolbar={
-          <KnowledgeBasePicker
-            value={knowledgeBaseId}
-            onChange={setKnowledgeBaseId}
-            disabled={create.isPending}
-          />
+          <>
+            <KnowledgeBasePicker
+              value={knowledgeBaseId}
+              onChange={setKnowledgeBaseId}
+              disabled={create.isPending}
+            />
+            <ProjectPicker
+              value={projectId}
+              onChange={setProjectId}
+              disabled={create.isPending}
+            />
+          </>
         }
       />
 

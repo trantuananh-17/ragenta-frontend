@@ -5,12 +5,14 @@ import { UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useUploadDocuments } from "../hooks/knowledge.hook";
 import { MAX_UPLOAD_BYTES } from "../service/knowledge.service";
+import { ChunkingMethodPicker, INHERIT } from "./chunking-method-picker";
 
 /** What the extractor can actually read. Anything else fails in the worker. */
-const ACCEPTED = ".pdf,.docx,.txt,.md,.html,.htm,.csv,.json";
+const ACCEPTED = ".pdf,.docx,.txt,.md,.html,.htm,.csv,.tsv,.json,.eml";
 
 function tooLarge(file: File) {
   return file.size > MAX_UPLOAD_BYTES;
@@ -35,6 +37,9 @@ export function DocumentUpload({
   const upload = useUploadDocuments(workspaceId, baseId);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  // Per-batch, not per-file: a drop of thirty files is one kind of document,
+  // and asking for a method thirty times would be worse than not offering it.
+  const [parserId, setParserId] = useState(INHERIT);
 
   const accept = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -49,7 +54,12 @@ export function DocumentUpload({
       });
     }
 
-    if (allowed.length > 0) upload.mutate(allowed);
+    if (allowed.length > 0) {
+      upload.mutate({
+        files: allowed,
+        parserId: parserId === INHERIT ? undefined : parserId,
+      });
+    }
   };
 
   return (
@@ -107,12 +117,28 @@ export function DocumentUpload({
             </Button>
           </p>
           <p className="text-xs text-muted-foreground">
-            PDF, DOCX, TXT, Markdown, HTML, CSV or JSON, up to{" "}
+            PDF, DOCX, TXT, Markdown, HTML, CSV, TSV, JSON or EML, up to{" "}
             {Math.floor(MAX_UPLOAD_BYTES / 1024 / 1024)} MB each. A scanned PDF
             has no text layer and will fail — there is no OCR yet.
           </p>
         </div>
       )}
+
+      <div className="mx-auto mt-4 max-w-sm text-left">
+        <Label htmlFor="upload-parser" className="text-xs">
+          Chunking method for this batch
+        </Label>
+        <div className="mt-1.5">
+          <ChunkingMethodPicker
+            id="upload-parser"
+            workspaceId={workspaceId}
+            value={parserId}
+            onChange={setParserId}
+            disabled={disabled || upload.isPending}
+            allowInherit
+          />
+        </div>
+      </div>
     </div>
   );
 }

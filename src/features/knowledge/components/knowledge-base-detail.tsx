@@ -3,10 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
+  CircleStop,
   Download,
   FileText,
   MoreHorizontal,
   RefreshCw,
+  Settings2,
   Trash2,
 } from "lucide-react";
 
@@ -34,6 +36,7 @@ import { useWorkspace } from "@/features/workspace/components/workspace-provider
 import { formatBytes, formatDateTime, formatNumber } from "@/lib/format";
 import { canAdminister, canContribute } from "@/lib/workspace";
 import {
+  useCancelDocument,
   useDeleteDocument,
   useDeleteKnowledgeBase,
   useDocumentsSuspense,
@@ -41,8 +44,10 @@ import {
   useKnowledgeBaseSuspense,
   useReindexDocument,
 } from "../hooks/knowledge.hook";
-import { DocumentStatusBadge } from "./document-status";
+import { ACTIVE_DOCUMENT_STATUSES } from "../service/knowledge.service";
+import { DocumentProgress, DocumentStatusBadge } from "./document-status";
 import { DocumentUpload } from "./document-upload";
+import { KnowledgeBaseSettingsDialog } from "./knowledge-base-settings-dialog";
 
 export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
   const { workspace } = useWorkspace();
@@ -50,12 +55,14 @@ export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
   const documents = useDocumentsSuspense(workspace.id, baseId);
 
   const reindex = useReindexDocument(workspace.id);
+  const cancel = useCancelDocument(workspace.id);
   const download = useDownloadDocument(workspace.id);
   const deleteDocument = useDeleteDocument(workspace.id);
   const deleteBase = useDeleteKnowledgeBase(workspace.id);
 
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [deletingBase, setDeletingBase] = useState(false);
+  const [editingSettings, setEditingSettings] = useState(false);
 
   const mayContribute = canContribute(workspace.role);
   const mayDeleteBase = canAdminister(workspace.role);
@@ -70,6 +77,15 @@ export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
           <>
             <Button asChild variant="outline" size="sm">
               <Link href="/chat">Chat against it</Link>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!mayContribute}
+              onClick={() => setEditingSettings(true)}
+            >
+              <Settings2 className="size-4" />
+              Settings
             </Button>
             <Button
               variant="destructive"
@@ -101,8 +117,17 @@ export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
         />
         <StatCard
           label="Chunking"
-          value={`${base.data.chunkTokenSize} / ${base.data.chunkOverlapPercent}%`}
-          hint="Tokens per chunk, overlap"
+          value={base.data.parserId}
+          hint={`${base.data.chunkTokenSize} tokens, ${base.data.chunkOverlapPercent}% overlap`}
+        />
+        <StatCard
+          label="Retrieval"
+          value={`${base.data.topK} passages`}
+          hint={
+            base.data.rerankModel
+              ? `Reranked with ${base.data.rerankModel}`
+              : `${Math.round(base.data.vectorWeight * 100)}% meaning, ${Math.round((1 - base.data.vectorWeight) * 100)}% wording`
+          }
         />
       </StatCardGrid>
 
@@ -148,10 +173,16 @@ export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
                     <span className="truncate">{document.name}</span>
                   </Link>
                 </TableCell>
-                <TableCell>
+                <TableCell className="min-w-[180px]">
                   <DocumentStatusBadge
                     status={document.status}
                     error={document.error}
+                  />
+                  <DocumentProgress
+                    className="mt-1.5"
+                    status={document.status}
+                    progress={document.progress}
+                    message={document.progressMessage}
                   />
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
@@ -183,10 +214,20 @@ export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         disabled={!mayContribute}
-                        onSelect={() => reindex.mutate(document.id)}
+                        onSelect={() => reindex.mutate({ documentId: document.id })}
                       >
                         <RefreshCw className="size-4" />
                         Re-index
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={
+                          !mayContribute ||
+                          !ACTIVE_DOCUMENT_STATUSES.includes(document.status)
+                        }
+                        onSelect={() => cancel.mutate(document.id)}
+                      >
+                        <CircleStop className="size-4" />
+                        Stop indexing
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         disabled={!mayContribute}
@@ -203,6 +244,13 @@ export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
           </TableBody>
         </Table>
       </div>
+
+      <KnowledgeBaseSettingsDialog
+        workspaceId={workspace.id}
+        base={base.data}
+        open={editingSettings}
+        onOpenChange={setEditingSettings}
+      />
 
       <ConfirmDialog
         open={pendingDelete !== null}
