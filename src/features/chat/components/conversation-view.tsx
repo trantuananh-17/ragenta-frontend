@@ -22,7 +22,10 @@ import {
   useSendMessage,
   useUpdateConversation,
 } from "../hooks/chat.hook";
-import { takePendingQuestion } from "../lib/pending-question";
+import {
+  peekPendingQuestion,
+  takePendingQuestion,
+} from "../lib/pending-question";
 import { ChatComposer } from "./chat-composer";
 import { ChatMessage, StreamingMessage } from "./chat-message";
 import { KnowledgeBasePicker, ModelPicker } from "./chat-pickers";
@@ -52,7 +55,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
     conversationId,
   );
 
-  const [model, setModel] = useState<ModelSelection | null>(null);
+  // A model picked on the blank slate is already chosen before this screen
+  // mounts, so it is the initial state rather than something assigned later.
+  const [model, setModel] = useState<ModelSelection | null>(
+    () => peekPendingQuestion(conversationId)?.model ?? null,
+  );
   // Which files this thread is currently scoped to. Kept in component state
   // rather than on the conversation: it is a lens on the next question, not a
   // property of the thread, and persisting it would silently narrow every later
@@ -67,9 +74,6 @@ export function ConversationView({ conversationId }: { conversationId: string })
   useEffect(() => {
     const question = takePendingQuestion(conversationId);
     if (!question) return;
-    // A model chosen before the thread existed belongs to this first turn, and
-    // stays selected afterwards so the next question runs on the same one.
-    if (question.model) setModel(question.model);
     void send({
       content: question.content,
       model: question.model ?? undefined,

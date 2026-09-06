@@ -25,6 +25,21 @@ export function setPendingQuestion(
   pending.set(conversationId, question);
 }
 
+/**
+ * Reads without consuming.
+ *
+ * For state that has to hold the pending model from the very first render — the
+ * composer's model chip — rather than being assigned from inside the effect that
+ * sends the question. Setting state in an effect body is a cascading render and
+ * the lint rule that says so is right: the value is known before the component
+ * ever paints.
+ */
+export function peekPendingQuestion(
+  conversationId: string,
+): PendingQuestion | undefined {
+  return pending.get(conversationId);
+}
+
 export function takePendingQuestion(
   conversationId: string,
 ): PendingQuestion | undefined {
