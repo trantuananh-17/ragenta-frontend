@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Play, Square } from "lucide-react";
+import { Check, Loader2, Play, Square, X } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -86,8 +86,32 @@ export function AgentRunPanel({
               <Loader2 className="size-3.5 animate-spin" />
               {streaming.phase === "retrieving"
                 ? "Searching the knowledge bases…"
-                : "Answering…"}
+                : streaming.round
+                  ? `Round ${streaming.round.round} of ${streaming.round.of}…`
+                  : "Answering…"}
             </p>
+          )}
+
+          {streaming.timeline.length > 0 && (
+            <ol className="space-y-1.5 border-l pl-3 text-xs">
+              {streaming.timeline.map((entry) => (
+                <li key={`${entry.seq}-${entry.name}`} className="space-y-0.5">
+                  <div className="flex items-center gap-1.5">
+                    {entry.ok === undefined ? (
+                      <Loader2 className="size-3 animate-spin text-muted-foreground" />
+                    ) : entry.ok ? (
+                      <Check className="size-3 text-emerald-600" />
+                    ) : (
+                      <X className="size-3 text-destructive" />
+                    )}
+                    <span className="font-medium">{entry.name}</span>
+                  </div>
+                  <p className="truncate text-muted-foreground">
+                    {entry.summary ?? entry.arguments}
+                  </p>
+                </li>
+              ))}
+            </ol>
           )}
 
           {streaming.warning && (

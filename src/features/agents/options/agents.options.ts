@@ -5,6 +5,7 @@ import {
   getAgentRun,
   getAgentRunSteps,
   getAgentRuns,
+  getAgentTools,
   getAgentVersions,
   getAgents,
 } from "../service/agents.service";
@@ -22,6 +23,8 @@ export const agentKeys = {
     [...agentKeys.all(), "run", workspaceId, runId] as const,
   steps: (workspaceId: string, runId: string) =>
     [...agentKeys.all(), "steps", workspaceId, runId] as const,
+  tools: (workspaceId: string) =>
+    [...agentKeys.all(), "tools", workspaceId] as const,
 };
 
 export const agentOptions = {
@@ -54,5 +57,13 @@ export const agentOptions = {
     queryOptions({
       queryKey: agentKeys.steps(workspaceId, runId),
       queryFn: () => getAgentRunSteps(workspaceId, runId),
+    }),
+  // Fixed in the build rather than per workspace, so it is fetched once and
+  // kept — a refetch could only ever return the same list.
+  tools: (workspaceId: string) =>
+    queryOptions({
+      queryKey: agentKeys.tools(workspaceId),
+      queryFn: () => getAgentTools(workspaceId),
+      staleTime: Infinity,
     }),
 };

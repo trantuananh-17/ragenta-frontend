@@ -37,6 +37,8 @@ export const agentVersionSchema = z.object({
   groundedOnly: z.boolean().default(true),
   tools: z.array(z.string()).default([]),
   maxRounds: z.number().default(1),
+  /** Null bounds a run by maxRounds alone. numeric arrives as a string. */
+  creditCeiling: z.coerce.number().nullable().default(null),
   createdBy: z.string().nullable(),
   createdAt: z.coerce.string(),
 });
@@ -79,6 +81,7 @@ export const agentRunStepSchema = z.object({
   seq: z.number(),
   kind: z.string(),
   status: z.string(),
+  name: z.string().nullable(),
   provider: z.string().nullable(),
   model: z.string().nullable(),
   inputTokens: z.number(),
@@ -120,6 +123,12 @@ export interface AgentConfigInput {
   vectorWeight?: number | null;
   rerank?: { provider: string; model: string } | null;
   groundedOnly?: boolean;
+  /** Which tools a run may call, by id. Validated by the backend. */
+  tools?: string[];
+  /** How many model-tool rounds one run may take. 1 means no loop. */
+  maxRounds?: number;
+  /** The most credits one run may spend before it is stopped. */
+  creditCeiling?: number | null;
 }
 
 export async function getAgents(workspaceId: string, limit = 50) {
@@ -250,7 +259,26 @@ function configPayload(config: AgentConfigInput) {
     vectorWeight: config.vectorWeight ?? null,
     rerank: config.rerank ?? null,
     groundedOnly: config.groundedOnly ?? true,
+    tools: config.tools ?? [],
+    maxRounds: config.maxRounds ?? 1,
+    creditCeiling: config.creditCeiling ?? null,
   };
+}
+
+/** What this deployment can give an agent. Fixed in the build, not per workspace. */
+export const agentToolSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+});
+
+export type AgentToolInfo = z.infer<typeof agentToolSchema>;
+
+export async function getAgentTools(
+  workspaceId: string,
+): Promise<AgentToolInfo[]> {
+  const response = await api.get(`workspaces/${workspaceId}/agent-tools`);
+  return z.array(agentToolSchema).parse(await response.json());
 }
 
 /**
@@ -280,6 +308,16 @@ export type AgentStreamEvent =
   | { type: "citations"; citations: Citation[] }
   /** A knowledge base this version names has been deleted and was skipped. */
   | { type: "warning"; message: string }
+  /** Which round of the tool loop is running. Absent for an agent with no tools. */
+  | { type: "round"; round: number; of: number }
+  | { type: "tool_started"; seq: number; name: string; arguments: string }
+  | {
+      type: "tool_finished";
+      seq: number;
+      name: string;
+      ok: boolean;
+      summary: string;
+    }
   | { type: "delta"; text: string }
   | {
       type: "done";
@@ -298,6 +336,24 @@ const streamEventSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("citations"), citations: z.array(citationSchema) }),
   z.object({ type: z.literal("warning"), message: z.string() }),
+  z.object({
+    type: z.literal("round"),
+    round: z.number(),
+    of: z.number(),
+  }),
+  z.object({
+    type: z.literal("tool_started"),
+    seq: z.number(),
+    name: z.string(),
+    arguments: z.string(),
+  }),
+  z.object({
+    type: z.literal("tool_finished"),
+    seq: z.number(),
+    name: z.string(),
+    ok: z.boolean(),
+    summary: z.string(),
+  }),
   z.object({ type: z.literal("delta"), text: z.string() }),
   z.object({
     type: z.literal("done"),

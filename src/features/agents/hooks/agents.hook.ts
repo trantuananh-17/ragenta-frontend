@@ -50,6 +50,11 @@ export function useAgentVersions(workspaceId: string, agentId: string) {
   return useQuery(agentOptions.versions(workspaceId, agentId));
 }
 
+/** The tools this deployment can give an agent. */
+export function useAgentTools(workspaceId: string) {
+  return useQuery(agentOptions.tools(workspaceId));
+}
+
 export function useCreateAgent(workspaceId: string) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -139,6 +144,16 @@ export function useDeleteAgent(workspaceId: string) {
   });
 }
 
+/** One tool call, as the timeline shows it while the run is still going. */
+export interface TimelineEntry {
+  seq: number;
+  name: string;
+  arguments: string;
+  /** Undefined while the call is still running. */
+  ok?: boolean;
+  summary?: string;
+}
+
 /** What is on screen while a run is streaming, before any row exists for it. */
 export interface StreamingRun {
   runId: string | null;
@@ -147,6 +162,9 @@ export interface StreamingRun {
   phase: "retrieving" | "generating";
   warning: string | null;
   stopping: boolean;
+  /** Null for an agent with no tools, which never reports a round. */
+  round: { round: number; of: number } | null;
+  timeline: TimelineEntry[];
 }
 
 /**
@@ -202,6 +220,8 @@ export function useRunAgent(workspaceId: string, agentId: string) {
         phase: "retrieving",
         warning: null,
         stopping: false,
+        round: null,
+        timeline: [],
       });
 
       try {
@@ -227,6 +247,45 @@ export function useRunAgent(workspaceId: string, agentId: string) {
           } else if (event.type === "warning") {
             setStreaming((current) =>
               current ? { ...current, warning: event.message } : current,
+            );
+          } else if (event.type === "round") {
+            setStreaming((current) =>
+              current
+                ? { ...current, round: { round: event.round, of: event.of } }
+                : current,
+            );
+          } else if (event.type === "tool_started") {
+            setStreaming((current) =>
+              current
+                ? {
+                    ...current,
+                    timeline: [
+                      ...current.timeline,
+                      {
+                        seq: event.seq,
+                        name: event.name,
+                        arguments: event.arguments,
+                      },
+                    ],
+                  }
+                : current,
+            );
+          } else if (event.type === "tool_finished") {
+            setStreaming((current) =>
+              current
+                ? {
+                    ...current,
+                    timeline: current.timeline.map((entry) =>
+                      // Matched on the name as well as the sequence number: the
+                      // finished event is numbered one behind the started one,
+                      // and an entry silently updated to the wrong call would be
+                      // worse than one that never fills in.
+                      entry.ok === undefined && entry.name === event.name
+                        ? { ...entry, ok: event.ok, summary: event.summary }
+                        : entry,
+                    ),
+                  }
+                : current,
             );
           } else if (event.type === "delta") {
             setStreaming((current) =>

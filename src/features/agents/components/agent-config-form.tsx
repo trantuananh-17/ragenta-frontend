@@ -25,6 +25,7 @@ import {
   parseModelKey,
 } from "@/features/models/service/models.service";
 import { useQuery } from "@tanstack/react-query";
+import { useAgentTools } from "../hooks/agents.hook";
 import type {
   AgentConfigInput,
   AgentVersion,
@@ -43,6 +44,9 @@ const schema = z.object({
   searchMode: z.enum(["hybrid", "vector", "keyword"]),
   topK: z.string(),
   groundedOnly: z.boolean(),
+  tools: z.array(z.string()).max(8),
+  maxRounds: z.string(),
+  creditCeiling: z.string(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -79,6 +83,12 @@ function defaultsFrom(version: AgentVersion | null | undefined): FormValues {
     searchMode: (version?.searchMode as SearchMode) ?? "hybrid",
     topK: version?.topK === null || version?.topK === undefined ? "" : String(version.topK),
     groundedOnly: version?.groundedOnly ?? true,
+    tools: version?.tools ?? [],
+    maxRounds: String(version?.maxRounds ?? 1),
+    creditCeiling:
+      version?.creditCeiling === null || version?.creditCeiling === undefined
+        ? ""
+        : String(version.creditCeiling),
   };
 }
 
@@ -106,6 +116,7 @@ export function AgentConfigForm({
 }) {
   const { data: catalogue } = useModelCatalogue(workspaceId);
   const { data: bases } = useQuery(knowledgeOptions.bases(workspaceId));
+  const { data: tools } = useAgentTools(workspaceId);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -127,7 +138,11 @@ export function AgentConfigForm({
   const selectedModel = useWatch({ control, name: "model" });
   const selectedSearchMode = useWatch({ control, name: "searchMode" });
   const groundedOnly = useWatch({ control, name: "groundedOnly" });
+  const selectedTools = useWatch({ control, name: "tools" });
   const grounded = selectedBases.length > 0;
+  // With the search tool the agent retrieves for itself, so the up-front
+  // retrieval settings below no longer decide anything about a run.
+  const searchesItself = selectedTools.includes("knowledge_search");
 
   const submit = form.handleSubmit((values) => {
     onSubmit({
@@ -139,6 +154,9 @@ export function AgentConfigForm({
       searchMode: values.searchMode,
       topK: optionalNumber(values.topK),
       groundedOnly: values.groundedOnly,
+      tools: values.tools,
+      maxRounds: Number(values.maxRounds) || 1,
+      creditCeiling: optionalNumber(values.creditCeiling),
     });
   });
 
@@ -215,7 +233,7 @@ export function AgentConfigForm({
             id="topK"
             inputMode="numeric"
             placeholder="Base default"
-            disabled={disabled || !grounded}
+            disabled={disabled || !grounded || searchesItself}
             {...form.register("topK")}
           />
         </div>
@@ -261,12 +279,87 @@ export function AgentConfigForm({
         </p>
       </div>
 
+      <div className="space-y-2">
+        <Label>Tools</Label>
+        <div className="space-y-2 rounded-lg border p-3">
+          {(tools ?? []).map((tool) => (
+            <label
+              key={tool.id}
+              className="flex items-start gap-2 text-sm"
+              htmlFor={`tool-${tool.id}`}
+            >
+              <Checkbox
+                id={`tool-${tool.id}`}
+                disabled={disabled}
+                className="mt-0.5"
+                checked={selectedTools.includes(tool.id)}
+                onCheckedChange={(checked) =>
+                  form.setValue(
+                    "tools",
+                    checked
+                      ? [...selectedTools, tool.id]
+                      : selectedTools.filter((id) => id !== tool.id),
+                  )
+                }
+              />
+              <span>
+                <span className="font-medium">{tool.title}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {tool.description}
+                </span>
+              </span>
+            </label>
+          ))}
+          {!tools?.length && (
+            <p className="text-sm text-muted-foreground">
+              This deployment offers no agent tools.
+            </p>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          With tools the agent decides what to do, in rounds, instead of
+          answering once. It can only call what is ticked here.
+        </p>
+      </div>
+
+      {selectedTools.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="maxRounds">Maximum rounds</Label>
+            <Input
+              id="maxRounds"
+              inputMode="numeric"
+              disabled={disabled}
+              {...form.register("maxRounds")}
+            />
+            <p className="text-xs text-muted-foreground">
+              How many times it may call tools and think again. 1 means it
+              answers once and calls nothing.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="creditCeiling">Credit ceiling per run</Label>
+            <Input
+              id="creditCeiling"
+              inputMode="numeric"
+              placeholder="No ceiling"
+              disabled={disabled}
+              {...form.register("creditCeiling")}
+            />
+            <p className="text-xs text-muted-foreground">
+              A round on a premium model costs many times one on a cheap model,
+              so rounds alone do not bound what a run can spend.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label>Search mode</Label>
           <Select
             value={selectedSearchMode}
-            disabled={disabled || !grounded}
+            disabled={disabled || !grounded || searchesItself}
             onValueChange={(next) => form.setValue("searchMode", next as SearchMode)}
           >
             <SelectTrigger className="w-full">

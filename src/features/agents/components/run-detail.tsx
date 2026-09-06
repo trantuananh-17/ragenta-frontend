@@ -81,7 +81,7 @@ export function RunDetail({ agentId, runId }: { agentId: string; runId: string }
 
       <DetailSection
         title="Steps"
-        description="One row per provider call, each with the usage reference it was billed under."
+        description="What the run did, in order. Every row that made a provider call carries the usage reference it was billed under; a tool that only read or fetched cost nothing."
       >
         {!steps || steps.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -93,7 +93,7 @@ export function RunDetail({ agentId, runId }: { agentId: string; runId: string }
               <TableHeader>
                 <TableRow>
                   <TableHead>#</TableHead>
-                  <TableHead>Kind</TableHead>
+                  <TableHead>Step</TableHead>
                   <TableHead>Model</TableHead>
                   <TableHead className="text-right">In</TableHead>
                   <TableHead className="text-right">Out</TableHead>
@@ -104,7 +104,17 @@ export function RunDetail({ agentId, runId }: { agentId: string; runId: string }
                 {steps.map((step) => (
                   <TableRow key={step.id}>
                     <TableCell className="tabular-nums">{step.seq}</TableCell>
-                    <TableCell>{step.kind}</TableCell>
+                    <TableCell>
+                      {step.name ?? step.kind}
+                      {step.name && (
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          {step.kind}
+                        </span>
+                      )}
+                      {step.status === "failed" && (
+                        <span className="ml-1 text-xs text-destructive">failed</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {step.model ? `${step.provider} / ${step.model}` : "—"}
                     </TableCell>
