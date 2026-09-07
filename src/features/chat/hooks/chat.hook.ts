@@ -548,6 +548,32 @@ export function useComposerAttachments(workspaceId: string) {
     );
   }, []);
 
+  /**
+   * A recording that could not be transcribed, taken back off the question.
+   *
+   * The clip only ever reaches the model as its transcript, so one without a
+   * transcript is a card that cannot be sent, still occupies one of the six
+   * slots, and describes itself as going with words that do not exist. It reads
+   * the live list and updates functionally because the voice hook calls back
+   * through the closure the *recording* started in, where this item did not yet
+   * exist.
+   */
+  const discardRecording = useCallback(
+    (attachmentId: string) => {
+      const item = itemsRef.current.find(
+        (candidate) => candidate.attachment?.id === attachmentId,
+      );
+      if (!item) return;
+
+      URL.revokeObjectURL(item.previewUrl);
+      void deleteAttachment(workspaceId, attachmentId).catch(() => {});
+      setItems((current) =>
+        current.filter((candidate) => candidate.localId !== item.localId),
+      );
+    },
+    [workspaceId],
+  );
+
   const remove = useCallback(
     (localId: string) => {
       const item = items.find((candidate) => candidate.localId === localId);
@@ -588,6 +614,7 @@ export function useComposerAttachments(workspaceId: string) {
     add,
     addRecording,
     markTranscribed,
+    discardRecording,
     remove,
     clear,
     /**
@@ -597,8 +624,9 @@ export function useComposerAttachments(workspaceId: string) {
      * A recording reaches the model as its transcript, never as bytes, so the
      * send refuses one that has not been transcribed yet — and a clip counts as
      * ready the moment it uploads, which is earlier than that. `transcribed` is
-     * the gate, so a transcription that failed leaves the clip in the strip and
-     * out of the question rather than failing the whole turn.
+     * the gate, so a clip still being transcribed is held out of the question
+     * rather than failing the whole turn; one whose transcription failed is
+     * taken off it altogether by `discardRecording`.
      */
     ready: items.flatMap((item) =>
       item.status === "ready" &&

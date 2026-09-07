@@ -81,13 +81,56 @@ function FlowEditorBody({
 }: FlowEditorProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const { screenToFlowPosition } = useReactFlow();
-  const canvas = useMemo(() => toCanvas(graph), [graph]);
+  /*
+    The size React Flow measured for each box, kept here because the DSL has no
+    place for it and the library will not remember it on our behalf.
+
+    A node is rendered `visibility: hidden` until it has been measured, and
+    `adoptUserNodes` re-reads `measured` from the array we pass on every change
+    rather than carrying the previous value forward. Rebuilding that array from
+    the graph therefore un-measures every box — which, since measuring is itself
+    a node change, is a loop that ends with a canvas that draws its background
+    and its controls and none of its steps.
+  */
+  const [measured, setMeasured] = useState<
+    Record<string, { width: number; height: number }>
+  >({});
+
+  const canvas = useMemo(() => {
+    const built = toCanvas(graph);
+    return {
+      edges: built.edges,
+      nodes: built.nodes.map((node) =>
+        measured[node.id] ? { ...node, measured: measured[node.id] } : node,
+      ),
+    };
+  }, [graph, measured]);
+
   const problems = useMemo(() => validateFlow(graph), [graph]);
   const blocked = hasBlockingProblem(problems);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       const next = applyNodeChanges(changes, canvas.nodes);
+
+      setMeasured((current) => {
+        let changed = false;
+        const updated = { ...current };
+        for (const node of next) {
+          const size = node.measured;
+          if (!size?.width || !size.height) continue;
+          const known = current[node.id];
+          if (known?.width === size.width && known.height === size.height) continue;
+          updated[node.id] = { width: size.width, height: size.height };
+          changed = true;
+        }
+        return changed ? updated : current;
+      });
+
+      // A measurement is the library reporting on itself; it says nothing the
+      // published flow records, and pushing it back through the graph would
+      // mark an untouched draft as edited on mount.
+      if (changes.every((change) => change.type === "dimensions")) return;
       onChange(fromCanvas(graph, next, canvas.edges));
     },
     [canvas.edges, canvas.nodes, graph, onChange],

@@ -101,6 +101,7 @@ export function ChatComposer({
     attach: attachments.addRecording,
     onTranscript: acceptTranscript,
     onTranscribed: attachments.markTranscribed,
+    onTranscribeFailed: attachments.discardRecording,
   });
 
   // Null is "not knowable yet", and the button stays available there: the

@@ -174,6 +174,7 @@ export function useVoiceInput({
   attach,
   onTranscript,
   onTranscribed,
+  onTranscribeFailed,
 }: {
   workspaceId: string;
   /** Uploads the clip and resolves with it, or null when the upload failed. */
@@ -185,6 +186,11 @@ export function useVoiceInput({
    * send and take the whole turn with it.
    */
   onTranscribed?: (attachmentId: string) => void;
+  /**
+   * There will be no transcript, so the clip has no way of reaching the model
+   * and should come back off the question rather than sit there unsendable.
+   */
+  onTranscribeFailed?: (attachmentId: string) => void;
 }) {
   const [status, setStatus] = useState<VoiceInputStatus>("idle");
   const [seconds, setSeconds] = useState(0);
@@ -260,6 +266,7 @@ export function useVoiceInput({
           toast.info("Nothing could be heard in that recording.");
         }
       } catch (error) {
+        onTranscribeFailed?.(attachment.id);
         // Said once, and then the microphone button is disabled rather than
         // every recording failing the same way in turn.
         if (isSpeechUnavailable(error)) {
@@ -278,7 +285,7 @@ export function useVoiceInput({
         setSeconds(0);
       }
     },
-    [attach, onTranscript, onTranscribed, workspaceId],
+    [attach, onTranscript, onTranscribed, onTranscribeFailed, workspaceId],
   );
 
   const stop = useCallback(() => {
