@@ -112,7 +112,7 @@ export function ChatComposer({
   const attachLabel = visionRefused
     ? "This model cannot read images. Pick a vision model to attach one."
     : attachments.full
-      ? `A question carries at most ${MAX_TURN_ATTACHMENTS} images.`
+      ? `A question carries at most ${MAX_TURN_ATTACHMENTS} files.`
       : "Attach an image";
 
   const recording = voice.status === "recording";

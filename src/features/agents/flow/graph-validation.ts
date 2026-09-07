@@ -36,6 +36,9 @@ export function hasBlockingProblem(problems: GraphProblem[]): boolean {
 /** The longest label the backend's node schema accepts. */
 const MAX_LABEL_LENGTH = 80;
 
+/** The ceiling the backend's loop schema puts on one loop node. */
+const MAX_LOOP_ITERATIONS = 25;
+
 /**
  * Everything wrong with a flow that can be seen without running it.
  *
@@ -113,6 +116,10 @@ export function validateFlow(graph: AgentGraph): GraphProblem[] {
       }
     }
 
+    if (node.type === "loop") {
+      problems.push(...loopProblems(graph, id, name, node));
+    }
+
     problems.push(...paramProblems(id, name, node));
   }
 
@@ -159,6 +166,74 @@ function warning(nodeId: string | null, message: string): GraphProblem {
 function text(node: FlowNode, key: string): string {
   const value = node.params[key];
   return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * A loop's body, checked as the edge the backend treats it as.
+ *
+ * `body` is the one parameter that names another node, so `validateGraph`
+ * checks it when a version is written rather than when the node runs — every
+ * rule below therefore blocks a publish. They exist because the engine runs the
+ * body itself, once per item, and takes it out of what the frontier picks up
+ * next: a body something else also leads to runs twice and is charged twice, a
+ * body with its own downstream has a branch that silently never runs, a body
+ * that stops to ask a person cannot be resumed part-way through a list, and a
+ * loop inside a loop multiplies a budget nobody looked at.
+ */
+function loopProblems(
+  graph: AgentGraph,
+  id: string,
+  name: string,
+  node: FlowNode,
+): GraphProblem[] {
+  const bodyId = text(node, "body");
+  if (!bodyId) {
+    return [blocking(id, `"${name}" is a loop, so it needs a step to run for each item.`)];
+  }
+
+  if (bodyId === id) {
+    return [blocking(id, `"${name}" cannot be its own loop body.`)];
+  }
+
+  const body = graph.nodes[bodyId];
+  if (!body) {
+    return [blocking(id, `"${name}" loops over "${bodyId}", which is not in the flow.`)];
+  }
+
+  const problems: GraphProblem[] = [];
+  const bodyName = nameOf(bodyId, body);
+
+  if (!node.downstream.includes(bodyId)) {
+    problems.push(blocking(id, `"${name}" loops over "${bodyName}" but does not lead to it.`));
+  }
+  if (body.upstream.length !== 1 || body.upstream[0] !== id) {
+    problems.push(
+      blocking(id, `"${name}" must be the only step leading to its loop body "${bodyName}".`),
+    );
+  }
+  if (body.downstream.length > 0) {
+    problems.push(
+      blocking(
+        id,
+        `Nothing runs after the loop body "${bodyName}" — put what comes next after "${name}" instead.`,
+      ),
+    );
+  }
+  if (body.type === "loop") {
+    problems.push(
+      blocking(id, `"${bodyName}" cannot be a loop body: a loop inside a loop is not supported.`),
+    );
+  }
+  if (body.type === "user_input") {
+    problems.push(
+      blocking(
+        id,
+        `"${bodyName}" cannot be a loop body: a run that stops to ask a person cannot be resumed part-way through a list.`,
+      ),
+    );
+  }
+
+  return problems;
 }
 
 /**
@@ -241,6 +316,55 @@ function paramProblems(id: string, name: string, node: FlowNode): GraphProblem[]
           );
         }
       });
+      break;
+    }
+
+    case "http":
+    case "browser":
+      required("url", "address to call");
+      break;
+
+    case "ocr":
+    case "stt":
+      required("attachmentId", "attachment to read");
+      break;
+
+    case "vision":
+      required("attachmentId", "attachment to look at");
+      required("question", "question");
+      break;
+
+    case "tts":
+      required("text", "text to speak");
+      break;
+
+    case "excel": {
+      if (node.params.operation === "write") {
+        const sheets = (node.params.sheets as unknown[] | undefined) ?? [];
+        if (sheets.length === 0) {
+          problems.push(error(id, `"${name}" writes a workbook with no sheets.`));
+        }
+      } else {
+        required("attachmentId", "workbook to read");
+      }
+      break;
+    }
+
+    case "loop": {
+      // Blocking, unlike every other required param here, because the backend
+      // parses a loop's params as the *first* step of its publish check — a
+      // failure there is reported as a structural problem and refuses the
+      // version. Marking these advisory would tell someone their flow publishes
+      // and then hand them a 400 with a message about a body node.
+      if (typeof node.params.items !== "string" || node.params.items.trim().length === 0) {
+        problems.push(blocking(id, `"${name}" has no list to repeat over.`));
+      }
+      const iterations = Number(node.params.maxIterations ?? 10);
+      if (!Number.isInteger(iterations) || iterations < 1 || iterations > MAX_LOOP_ITERATIONS) {
+        problems.push(
+          blocking(id, `"${name}" repeats a number of times outside 1 to ${MAX_LOOP_ITERATIONS}.`),
+        );
+      }
       break;
     }
 

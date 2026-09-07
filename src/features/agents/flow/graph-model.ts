@@ -441,6 +441,27 @@ function withBranchTargets(node: FlowNode, byHandle: Map<string, string[]>): Flo
   return node;
 }
 
+/**
+ * Sets a node's parameters and re-derives every edge from the result.
+ *
+ * A branch target chosen in the settings panel is the same edge as one drawn on
+ * the canvas, so it takes the same path: writing `params` alone would leave the
+ * target's `upstream` empty, and the backend refuses to publish a node nothing
+ * leads to — while the canvas draws the edge and shows no reason for it.
+ */
+export function setNodeParams(
+  graph: AgentGraph,
+  id: string,
+  params: Record<string, unknown>,
+): AgentGraph {
+  const node = graph.nodes[id];
+  if (!node) return graph;
+
+  const updated: AgentGraph = { nodes: { ...graph.nodes, [id]: { ...node, params } } };
+  const canvas = toCanvas(updated);
+  return fromCanvas(updated, canvas.nodes, canvas.edges);
+}
+
 /** A readable, collision-free id for a node the user just dropped. */
 export function newNodeId(graph: AgentGraph, type: FlowNodeType): string {
   let index = 1;
@@ -516,6 +537,11 @@ function withoutReferencesTo(node: FlowNode, removed: string): FlowNode {
       ),
       otherwise: otherwiseOf(next).filter((entry) => entry !== removed),
     };
+  } else if (next.type === "loop" && next.params.body === removed) {
+    // A loop's body is a reference like any other, and the only one held in a
+    // params field the canvas never draws — left behind, it is a flow the
+    // backend refuses to publish for a step nobody can see any more.
+    next.params = { ...next.params, body: "" };
   }
 
   return next;

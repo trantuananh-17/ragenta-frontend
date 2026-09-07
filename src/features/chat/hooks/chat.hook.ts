@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   useMutation,
@@ -20,6 +20,7 @@ import {
   streamMessage,
   updateConversation,
   uploadAttachment,
+  ACCEPTED_ATTACHMENT_TYPES,
   MAX_ATTACHMENT_BYTES,
   MAX_TURN_ATTACHMENTS,
   type Citation,
@@ -218,9 +219,9 @@ export function useSendMessage(workspaceId: string, conversationId: string) {
     async (
       input: SendMessageInput,
       /**
-       * The uploaded images `input.attachmentIds` names. Passed alongside rather
-       * than inside the payload because the wire carries ids and the optimistic
-       * bubble needs the files themselves.
+       * The uploaded files `input.attachmentIds` names — images and recordings
+       * alike. Passed alongside rather than inside the payload because the wire
+       * carries ids and the optimistic bubble needs the files themselves.
        */
       attachments: MessageAttachment[] = [],
     ) => {
@@ -345,7 +346,20 @@ export interface ComposerAttachment {
 }
 
 /**
- * The images attached to the next question.
+ * What a chosen file is shown as in the strip, or null for a type a question
+ * cannot carry.
+ *
+ * A drop never passes through the picker's `accept`, so this is the only place
+ * a dropped PDF is turned away — before it is uploaded, and before it is
+ * labelled an image it is not. A recording has its own way in, so nothing
+ * chosen here is audio.
+ */
+function chosenKind(file: File): ComposerAttachment["kind"] | null {
+  return ACCEPTED_ATTACHMENT_TYPES.split(",").includes(file.type) ? "image" : null;
+}
+
+/**
+ * The files attached to the next question.
  *
  * Uploaded on selection rather than on send, which is what the two-step backend
  * contract is for: the slow part happens while the question is still being
@@ -358,6 +372,28 @@ export function useComposerAttachments(workspaceId: string) {
   // Keyed by localId so removing a thumbnail can cancel the upload behind it,
   // which is what stops a removed image from being stored anyway.
   const uploadsRef = useRef(new Map<string, AbortController>());
+  /**
+   * The committed list, for the two callers that cannot use a render's copy: a
+   * recording is attached from the closure the recording *started* in, so
+   * anything chosen while it ran is missing there, and unmount cleanup runs
+   * from an effect that must not re-subscribe on every change.
+   */
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(
+    () => () => {
+      // Leaving the composer — switching conversation is one click — must not
+      // pin the previews in memory for the life of the tab, nor leave uploads
+      // running for a strip that no longer exists.
+      for (const item of itemsRef.current) URL.revokeObjectURL(item.previewUrl);
+      for (const controller of uploadsRef.current.values()) controller.abort();
+      uploadsRef.current.clear();
+    },
+    [],
+  );
 
   /**
    * Resolves with the stored attachment, or null when it never landed. The
@@ -409,40 +445,53 @@ export function useComposerAttachments(workspaceId: string) {
     (files: File[]) => {
       if (files.length === 0) return;
 
+      const typed: { file: File; kind: ComposerAttachment["kind"] }[] = [];
+      for (const file of files) {
+        const kind = chosenKind(file);
+        if (!kind) {
+          toast.error(`${file.name} cannot be attached`, {
+            description: "A question carries PNG, JPEG, WebP or GIF images.",
+          });
+          continue;
+        }
+        typed.push({ file, kind });
+      }
+      if (typed.length === 0) return;
+
       const room = MAX_TURN_ATTACHMENTS - items.length;
       if (room <= 0) {
-        toast.error(`A question carries at most ${MAX_TURN_ATTACHMENTS} images.`);
+        toast.error(`A question carries at most ${MAX_TURN_ATTACHMENTS} files.`);
         return;
       }
-      if (files.length > room) {
-        toast.error(`Only ${room} more image${room === 1 ? "" : "s"} fit on this question.`);
+      if (typed.length > room) {
+        toast.error(`Only ${room} more file${room === 1 ? "" : "s"} fit on this question.`);
       }
 
       // Refused here as well as on the server: the server refusal is the one
       // that counts, but making someone upload 40 MB to be told no is a poor
       // way to spend their connection.
-      const chosen = files.slice(0, room);
-      for (const file of chosen.filter((file) => file.size > MAX_ATTACHMENT_BYTES)) {
+      const chosen = typed.slice(0, room);
+      for (const { file } of chosen.filter((entry) => entry.file.size > MAX_ATTACHMENT_BYTES)) {
         toast.error(`${file.name} is too large`, {
-          description: `The limit is ${Math.floor(MAX_ATTACHMENT_BYTES / 1024 / 1024)} MB per image.`,
+          description: `The limit is ${Math.floor(MAX_ATTACHMENT_BYTES / 1024 / 1024)} MB per file.`,
         });
       }
 
-      const accepted = chosen.filter((file) => file.size <= MAX_ATTACHMENT_BYTES);
+      const accepted = chosen.filter((entry) => entry.file.size <= MAX_ATTACHMENT_BYTES);
       if (accepted.length === 0) return;
 
-      const started = accepted.map((file) => ({
+      const started = accepted.map((entry) => ({
         localId: crypto.randomUUID(),
-        fileName: file.name,
-        kind: "image" as const,
-        previewUrl: URL.createObjectURL(file),
+        fileName: entry.file.name,
+        kind: entry.kind,
+        previewUrl: URL.createObjectURL(entry.file),
         status: "uploading" as const,
         attachment: null,
         error: null,
       }));
 
       setItems((current) => [...current, ...started]);
-      started.forEach((item, index) => void upload(item.localId, accepted[index]));
+      started.forEach((item, index) => void upload(item.localId, accepted[index].file));
     },
     [items.length, upload],
   );
@@ -456,7 +505,11 @@ export function useComposerAttachments(workspaceId: string) {
    */
   const addRecording = useCallback(
     async (file: File): Promise<MessageAttachment | null> => {
-      if (items.length >= MAX_TURN_ATTACHMENTS) {
+      // The live list, not this render's: the recorder calls back with the
+      // closure it was given when recording started, and images chosen while it
+      // ran are not in that one — a seventh file would be refused by the server
+      // with the whole turn behind it.
+      if (itemsRef.current.length >= MAX_TURN_ATTACHMENTS) {
         toast.error(`A question carries at most ${MAX_TURN_ATTACHMENTS} files.`);
         return null;
       }
@@ -477,7 +530,7 @@ export function useComposerAttachments(workspaceId: string) {
 
       return upload(localId, file);
     },
-    [items.length, upload],
+    [upload],
   );
 
   /**

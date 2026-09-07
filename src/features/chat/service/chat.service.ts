@@ -247,7 +247,7 @@ export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
  */
 export const ACCEPTED_ATTACHMENT_TYPES = "image/png,image/jpeg,image/webp,image/gif";
 
-/** `sendMessageSchema` caps a turn at six images, and so does the composer. */
+/** `sendMessageSchema` caps a turn at six files, and so does the composer. */
 export const MAX_TURN_ATTACHMENTS = 6;
 
 /**
@@ -266,9 +266,10 @@ export function attachmentContentUrl(
 }
 
 /**
- * Upload one image, before the turn that will carry it exists.
+ * Upload one file — an image, or a recording made in the composer — before the
+ * turn that will carry it exists.
  *
- * Two steps rather than a multipart send: the image is stored and validated
+ * Two steps rather than a multipart send: the file is stored and validated
  * while the question is still being typed, so pressing send stays a small JSON
  * request that either starts a stream or is refused outright. Raw fetch rather
  * than ky so the browser sets the multipart boundary itself — a hand-written
@@ -317,7 +318,7 @@ export async function deleteAttachment(
 export interface SendMessageInput {
   /** May be empty, but only when the turn carries attachments. */
   content: string;
-  /** Images already uploaded, in the order they were attached. */
+  /** Files already uploaded, in the order they were attached. */
   attachmentIds?: string[];
   /** Narrows retrieval to specific documents. Empty means every document. */
   documentIds?: string[];

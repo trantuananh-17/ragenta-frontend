@@ -17,9 +17,10 @@ export interface PendingQuestion {
   /** A model chosen on the blank slate applies to the turn it was chosen for. */
   model: { provider: string; model: string } | null;
   /**
-   * Images attached before the conversation existed. Already uploaded, and this
-   * map holds the objects rather than serialising them, so they survive the
-   * navigation intact and the first turn carries them.
+   * Files attached before the conversation existed — images and recordings
+   * alike. Already uploaded, and this map holds the objects rather than
+   * serialising them, so they survive the navigation intact and the first turn
+   * carries them.
    */
   attachments: MessageAttachment[];
 }

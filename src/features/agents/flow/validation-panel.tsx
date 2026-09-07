@@ -24,7 +24,7 @@ export function ValidationPanel({
   return (
     <div className="space-y-2 rounded-lg border p-3">
       <Label className="text-xs">
-        Checks
+        Checks{" "}
         {blocking > 0 && (
           <span className="text-destructive tabular-nums">
             {blocking} blocking publish

@@ -140,6 +140,11 @@ function microphoneMessage(error: unknown): string {
   if (name === "NotReadableError") {
     return "The microphone is in use by another application.";
   }
+  // Raised by `MediaRecorder` rather than by `getUserMedia`: the microphone was
+  // reached and no container this browser offers could be recorded in.
+  if (name === "NotSupportedError") {
+    return "This browser cannot record audio in a format the server accepts.";
+  }
   return "The microphone could not be started.";
 }
 
@@ -197,6 +202,15 @@ export function useVoiceInput({
   const chunksRef = useRef<Blob[]>([]);
   const cancelledRef = useRef(false);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /**
+   * Held from the first click until the stream is released.
+   *
+   * `status` cannot do this job: it only becomes "recording" after the
+   * permission prompt has been awaited, so a second click while the prompt is
+   * open still reads "idle" — and opens a second microphone that nothing then
+   * holds a reference to.
+   */
+  const startingRef = useRef(false);
 
   /**
    * Every track is stopped, not just the recorder: a live `MediaStream` keeps
@@ -208,6 +222,7 @@ export function useVoiceInput({
       track.stop();
     }
     recorderRef.current = null;
+    startingRef.current = false;
     if (tickRef.current) {
       clearInterval(tickRef.current);
       tickRef.current = null;
@@ -279,12 +294,14 @@ export function useVoiceInput({
   }, []);
 
   const start = useCallback(async () => {
-    if (status !== "idle" || !isRecordingSupported()) return;
+    if (startingRef.current || status !== "idle" || !isRecordingSupported()) return;
+    startingRef.current = true;
 
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (error) {
+      startingRef.current = false;
       toast.error("The microphone could not be used", {
         description: microphoneMessage(error),
       });
@@ -292,38 +309,55 @@ export function useVoiceInput({
     }
 
     const preferred = pickRecordingMimeType();
-    const recorder = new MediaRecorder(
-      stream,
-      preferred ? { mimeType: preferred } : undefined,
-    );
-
-    chunksRef.current = [];
-    cancelledRef.current = false;
-    recorderRef.current = recorder;
-
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunksRef.current.push(event.data);
-    };
-
-    recorder.onstop = () => {
-      const chunks = chunksRef.current;
-      chunksRef.current = [];
-      const mimeType = recorder.mimeType || preferred || "audio/webm";
-      release();
-
-      if (cancelledRef.current || chunks.length === 0) {
-        setStatus("idle");
-        setSeconds(0);
-        return;
-      }
-
-      const blob = new Blob(chunks, { type: mimeType });
-      void transcribeClip(
-        new File([blob], recordingFileName(mimeType), { type: mimeType }),
+    let recorder: MediaRecorder;
+    try {
+      // Inside the guard with `start()`: Safari refuses a container it cannot
+      // encode here rather than when it was asked what it supports, and an
+      // unhandled rejection at this point would leave the microphone open with
+      // nothing on screen to say so.
+      recorder = new MediaRecorder(
+        stream,
+        preferred ? { mimeType: preferred } : undefined,
       );
-    };
 
-    recorder.start();
+      chunksRef.current = [];
+      cancelledRef.current = false;
+      recorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = () => {
+        const chunks = chunksRef.current;
+        chunksRef.current = [];
+        const mimeType = recorder.mimeType || preferred || "audio/webm";
+        release();
+
+        if (cancelledRef.current || chunks.length === 0) {
+          setStatus("idle");
+          setSeconds(0);
+          return;
+        }
+
+        const blob = new Blob(chunks, { type: mimeType });
+        void transcribeClip(
+          new File([blob], recordingFileName(mimeType), { type: mimeType }),
+        );
+      };
+
+      recorder.start();
+    } catch (error) {
+      // `release` only knows the stream through the recorder, which may never
+      // have been constructed, so the tracks are stopped from the stream itself.
+      for (const track of stream.getTracks()) track.stop();
+      release();
+      toast.error("The recording could not be started", {
+        description: microphoneMessage(error),
+      });
+      return;
+    }
+
     setSeconds(0);
     setStatus("recording");
 

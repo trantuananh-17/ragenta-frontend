@@ -116,11 +116,11 @@ export function MessageAttachments({
 }
 
 /**
- * The strip above the question box, while the images are still being uploaded.
+ * The strip above the question box, while the files are still being uploaded.
  *
- * Each thumbnail shows its own upload: one that failed says so and can be
- * dropped, and the rest of the batch is still sendable — a failure here costs
- * one image, not the question.
+ * Each entry — a thumbnail, or a player for a recording — shows its own upload:
+ * one that failed says so and can be dropped, and the rest of the batch is
+ * still sendable, so a failure here costs one file, not the question.
  */
 export function ComposerAttachments({
   items,
@@ -141,9 +141,9 @@ export function ComposerAttachments({
             /*
               Playable while the question is still being edited, so a transcript
               that reads oddly can be checked against what was actually said. The
-              caption is not decoration: a turn carries images only, so the clip
-              contributes its words and is then dropped, and a player that looked
-              like an attachment would promise otherwise.
+              caption is not decoration: the model is given the transcript and
+              never the audio, so it says what the clip actually contributes to
+              the answer, while the clip itself is kept beside it on the turn.
             */
             <div
               className={cn(

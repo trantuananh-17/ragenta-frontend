@@ -33,6 +33,7 @@ import {
   addNodeToGraph,
   fromCanvas,
   removeNodeFromGraph,
+  setNodeParams,
   toCanvas,
   type AgentGraph,
   type FlowNodeType,
@@ -256,11 +257,7 @@ function FlowEditorBody({
                 node={node}
                 toolIds={toolIds}
                 disabled={disabled}
-                onChange={(params) =>
-                  onChange({
-                    nodes: { ...graph.nodes, [selected]: { ...node, params } },
-                  })
-                }
+                onChange={(params) => onChange(setNodeParams(graph, selected, params))}
               />
 
               {node.type !== "begin" && (
