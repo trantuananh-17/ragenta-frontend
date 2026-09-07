@@ -221,6 +221,240 @@ export function NodeParams({
     );
   }
 
+  const text = (key: string, fallback = "") =>
+    typeof params[key] === "string" ? (params[key] as string) : fallback;
+
+  if (node.type === "ocr" || node.type === "stt") {
+    return (
+      <div className="space-y-3">
+        <Field
+          label="Attachment"
+          hint="The id of an uploaded file, usually from an earlier step's output."
+        >
+          <Input
+            value={text("attachmentId")}
+            disabled={disabled}
+            onChange={(event) => set("attachmentId", event.target.value)}
+          />
+        </Field>
+        {node.type === "stt" && (
+          <Field label="Language (optional)" hint="Two letters, e.g. vi. Detected when blank.">
+            <Input
+              value={text("language")}
+              disabled={disabled}
+              maxLength={2}
+              placeholder="vi"
+              onChange={(event) => set("language", event.target.value.trim() || undefined)}
+            />
+          </Field>
+        )}
+      </div>
+    );
+  }
+
+  if (node.type === "vision") {
+    return (
+      <div className="space-y-3">
+        <Field label="Attachment">
+          <Input
+            value={text("attachmentId")}
+            disabled={disabled}
+            onChange={(event) => set("attachmentId", event.target.value)}
+          />
+        </Field>
+        <Field label="Question">
+          <Textarea
+            rows={3}
+            value={text("question")}
+            disabled={disabled}
+            onChange={(event) => set("question", event.target.value)}
+          />
+        </Field>
+      </div>
+    );
+  }
+
+  if (node.type === "tts") {
+    return (
+      <div className="space-y-3">
+        <Field label="Text to speak">
+          <Textarea
+            rows={3}
+            value={text("text")}
+            disabled={disabled}
+            onChange={(event) => set("text", event.target.value)}
+          />
+        </Field>
+        <Field
+          label="Voice (optional)"
+          hint="Voice ids belong to the speech service. Blank uses the deployment default."
+        >
+          <Input
+            value={text("voice")}
+            disabled={disabled}
+            onChange={(event) => set("voice", event.target.value.trim() || undefined)}
+          />
+        </Field>
+      </div>
+    );
+  }
+
+  if (node.type === "http" || node.type === "browser") {
+    const method = text("method", "GET");
+    return (
+      <div className="space-y-3">
+        <Field
+          label="URL"
+          hint="Private and link-local addresses are refused by the server, whatever is typed here."
+        >
+          <Input
+            value={text("url")}
+            disabled={disabled}
+            placeholder="https://"
+            onChange={(event) => set("url", event.target.value)}
+          />
+        </Field>
+        {node.type === "http" && (
+          <>
+            <Field label="Method">
+              <Select
+                value={method}
+                disabled={disabled}
+                onValueChange={(value) => set("method", value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GET">GET</SelectItem>
+                  <SelectItem value="POST">POST</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            {method === "POST" && (
+              <Field label="Body">
+                <Textarea
+                  rows={3}
+                  value={text("body")}
+                  disabled={disabled}
+                  onChange={(event) => set("body", event.target.value)}
+                />
+              </Field>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  if (node.type === "excel") {
+    const operation = text("operation", "read");
+    return (
+      <div className="space-y-3">
+        <Field label="Operation">
+          <Select
+            value={operation}
+            disabled={disabled}
+            onValueChange={(value) =>
+              // The two operations take different fields, so switching resets to
+              // that operation's own defaults rather than carrying the other's
+              // over and failing validation on a field the form no longer shows.
+              onChange(
+                value === "read"
+                  ? { operation: "read", attachmentId: "" }
+                  : { operation: "write", sheets: [{ name: "Sheet1", rows: [[""]] }] },
+              )
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="read">Read a workbook</SelectItem>
+              <SelectItem value="write">Write a workbook</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        {operation === "read" ? (
+          <>
+            <Field label="Attachment">
+              <Input
+                value={text("attachmentId")}
+                disabled={disabled}
+                onChange={(event) => set("attachmentId", event.target.value)}
+              />
+            </Field>
+            <Field label="Sheet (optional)" hint="Blank reads every sheet.">
+              <Input
+                value={text("sheet")}
+                disabled={disabled}
+                onChange={(event) => set("sheet", event.target.value.trim() || undefined)}
+              />
+            </Field>
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            The rows a write step produces are normally built by an earlier model or
+            agent step. Point that step at this one and reference its output.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (node.type === "loop") {
+    return (
+      <div className="space-y-3">
+        <Field label="List" hint="A template producing the items, e.g. an earlier step's text.">
+          <Input
+            value={text("items")}
+            disabled={disabled}
+            onChange={(event) => set("items", event.target.value)}
+          />
+        </Field>
+        <Field label="Format">
+          <Select
+            value={text("format", "lines")}
+            disabled={disabled}
+            onValueChange={(value) => set("format", value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="lines">One item per line</SelectItem>
+              <SelectItem value="json">A JSON array</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field
+          label="Step to repeat"
+          hint="Exactly one step, and it must lead nowhere else. Its only way in is this loop."
+        >
+          <TargetPicker
+            targets={targets}
+            value={text("body")}
+            disabled={disabled}
+            onChange={(value) => set("body", value)}
+          />
+        </Field>
+        <Field
+          label="Most iterations"
+          hint="Capped at 25, and by whatever the run can still afford."
+        >
+          <Input
+            type="number"
+            min={1}
+            max={25}
+            value={typeof params.maxIterations === "number" ? params.maxIterations : 10}
+            disabled={disabled}
+            onChange={(event) => set("maxIterations", Number(event.target.value))}
+          />
+        </Field>
+      </div>
+    );
+  }
+
   if (node.type === "categorize") {
     const categories: CategoryParam[] = categoriesOf(node);
     return (

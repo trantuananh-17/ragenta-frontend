@@ -17,6 +17,14 @@ export const NODE_TYPES = [
   "switch",
   "user_input",
   "message",
+  "http",
+  "ocr",
+  "vision",
+  "stt",
+  "tts",
+  "excel",
+  "browser",
+  "loop",
 ] as const;
 
 export type FlowNodeType = (typeof NODE_TYPES)[number];
@@ -86,6 +94,46 @@ export const NODE_CATALOGUE: Record<
     title: "Message",
     description: "Say something to whoever is watching. Costs nothing.",
     colour: "var(--color-slate-500)",
+  },
+  http: {
+    title: "HTTP",
+    description: "Call an external API. Private address ranges are refused.",
+    colour: "var(--color-cyan-500)",
+  },
+  ocr: {
+    title: "Read document",
+    description: "Extract text, tables and fields from an attached image.",
+    colour: "var(--color-teal-500)",
+  },
+  vision: {
+    title: "Look at image",
+    description: "Ask a question about an attached image.",
+    colour: "var(--color-teal-500)",
+  },
+  stt: {
+    title: "Transcribe",
+    description: "Turn an attached recording into text.",
+    colour: "var(--color-indigo-500)",
+  },
+  tts: {
+    title: "Speak",
+    description: "Turn text into audio. Its output is the new attachment's id.",
+    colour: "var(--color-indigo-500)",
+  },
+  excel: {
+    title: "Spreadsheet",
+    description: "Read a workbook, or write one and attach it.",
+    colour: "var(--color-lime-600)",
+  },
+  browser: {
+    title: "Browse",
+    description: "Read a page through the browser service. Reading only.",
+    colour: "var(--color-fuchsia-500)",
+  },
+  loop: {
+    title: "For each",
+    description: "Run one step once per item in a list, up to a limit you set.",
+    colour: "var(--color-yellow-600)",
   },
 };
 
@@ -504,6 +552,26 @@ export function defaultParams(type: FlowNodeType): Record<string, unknown> {
       return { prompt: "Please confirm before this continues.", fields: ["answer"] };
     case "message":
       return { text: "{{begin.text}}" };
+    case "http":
+      return { url: "", method: "GET", body: "" };
+    case "ocr":
+      return { attachmentId: "" };
+    case "vision":
+      return { attachmentId: "", question: "{{begin.text}}" };
+    case "stt":
+      return { attachmentId: "" };
+    case "tts":
+      return { text: "{{begin.text}}" };
+    case "excel":
+      // Reading is the safe default: writing produces a file, and a step that
+      // creates something the moment it is dropped on the canvas is a surprise.
+      return { operation: "read", attachmentId: "" };
+    case "browser":
+      return { url: "" };
+    case "loop":
+      // `body` is empty until the author wires one, and publishing is blocked
+      // until they do — the backend refuses a loop whose body is not an edge.
+      return { items: "{{begin.text}}", format: "lines", body: "", maxIterations: 10 };
     default:
       return {};
   }
