@@ -27,12 +27,13 @@ function aspectRatio(attachment: MessageAttachment): string | undefined {
 }
 
 /**
- * The images on a sent question.
+ * The files on a sent question.
  *
  * The `src` is our own content endpoint, which answers 302 to a short-lived
- * presigned URL. Pointing an `<img>` straight at it is deliberate: the browser
- * sends the session cookie to our origin and follows the redirect itself, so the
- * bytes never pass through JavaScript and nothing has to hold a blob alive.
+ * presigned URL. Pointing an `<img>` — or an `<audio>` — straight at it is
+ * deliberate: the browser sends the session cookie to our origin and follows the
+ * redirect itself, so the bytes never pass through JavaScript and nothing has to
+ * hold a blob alive.
  */
 export function MessageAttachments({
   attachments,
@@ -44,10 +45,28 @@ export function MessageAttachments({
 
   if (attachments.length === 0) return null;
 
+  const recordings = attachments.filter(
+    (attachment) => attachment.kind === "audio",
+  );
+  const images = attachments.filter(
+    (attachment) => attachment.kind !== "audio",
+  );
+
   return (
     <>
+      {recordings.map((attachment) => (
+        <audio
+          key={attachment.id}
+          controls
+          preload="none"
+          title={attachment.fileName}
+          src={attachmentContentUrl(workspaceId, attachment.id)}
+          className="h-9 w-full max-w-[20rem]"
+        />
+      ))}
+
       <div className="flex flex-wrap justify-end gap-2">
-        {attachments.map((attachment) => (
+        {images.map((attachment) => (
           <button
             key={attachment.id}
             type="button"
@@ -118,24 +137,62 @@ export function ComposerAttachments({
     <div className="flex flex-wrap gap-2 px-3 pt-3">
       {items.map((item) => (
         <div key={item.localId} className="relative">
-          {/* eslint-disable-next-line @next/next/no-img-element -- an object URL
-              over the chosen file; there is nothing for the optimizer to fetch. */}
-          <img
-            src={item.previewUrl}
-            alt={item.fileName}
-            title={item.error ?? item.fileName}
-            className={cn(
-              "size-16 rounded-lg border object-cover",
-              item.status !== "ready" && "opacity-60",
-              item.status === "failed" && "border-destructive",
-            )}
-          />
+          {item.kind === "audio" ? (
+            /*
+              Playable while the question is still being edited, so a transcript
+              that reads oddly can be checked against what was actually said. The
+              caption is not decoration: a turn carries images only, so the clip
+              contributes its words and is then dropped, and a player that looked
+              like an attachment would promise otherwise.
+            */
+            <div
+              className={cn(
+                "flex h-16 flex-col justify-center gap-0.5 rounded-lg border px-2",
+                item.status === "failed" && "border-destructive",
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <audio
+                  src={item.previewUrl}
+                  controls
+                  title={item.error ?? item.fileName}
+                  className="h-8 w-56"
+                />
+                {item.status === "uploading" && (
+                  <Spinner className="size-4 text-muted-foreground" />
+                )}
+                {item.status === "failed" && (
+                  <AlertTriangle className="size-4 text-destructive" />
+                )}
+              </div>
+              <span className="text-[10px] text-muted-foreground">
+                {item.status === "failed"
+                  ? (item.error ?? "This recording could not be uploaded.")
+                  : "Voice note — only the text is sent"}
+              </span>
+            </div>
+          ) : (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element -- an object URL
+                  over the chosen file; there is nothing for the optimizer to fetch. */}
+              <img
+                src={item.previewUrl}
+                alt={item.fileName}
+                title={item.error ?? item.fileName}
+                className={cn(
+                  "size-16 rounded-lg border object-cover",
+                  item.status !== "ready" && "opacity-60",
+                  item.status === "failed" && "border-destructive",
+                )}
+              />
 
-          {item.status === "uploading" && (
-            <Spinner className="absolute inset-0 m-auto text-muted-foreground" />
-          )}
-          {item.status === "failed" && (
-            <AlertTriangle className="absolute inset-0 m-auto size-4 text-destructive" />
+              {item.status === "uploading" && (
+                <Spinner className="absolute inset-0 m-auto text-muted-foreground" />
+              )}
+              {item.status === "failed" && (
+                <AlertTriangle className="absolute inset-0 m-auto size-4 text-destructive" />
+              )}
+            </>
           )}
 
           <Button

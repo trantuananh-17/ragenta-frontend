@@ -323,12 +323,14 @@ export function useSendMessage(workspaceId: string, conversationId: string) {
   return { send, stop, streaming, pending };
 }
 
-/** One image in the composer, from the moment it is chosen. */
+/** One file in the composer, from the moment it is chosen or recorded. */
 export interface ComposerAttachment {
   /** Stable for the life of the thumbnail; the server id only arrives later. */
   localId: string;
   fileName: string;
-  /** An object URL over the chosen file, so the thumbnail is there at once. */
+  /** What the strip shows: a thumbnail, or a player for a recording. */
+  kind: "image" | "audio";
+  /** An object URL over the chosen file, so the preview is there at once. */
   previewUrl: string;
   status: "uploading" | "ready" | "failed";
   /** Set once the upload has landed. What the send actually refers to. */
@@ -351,8 +353,13 @@ export function useComposerAttachments(workspaceId: string) {
   // which is what stops a removed image from being stored anyway.
   const uploadsRef = useRef(new Map<string, AbortController>());
 
+  /**
+   * Resolves with the stored attachment, or null when it never landed. The
+   * return matters only to a recording, which has to be transcribed the moment
+   * it is stored; a chosen image is fire-and-forget.
+   */
   const upload = useCallback(
-    async (localId: string, file: File) => {
+    async (localId: string, file: File): Promise<MessageAttachment | null> => {
       const controller = new AbortController();
       uploadsRef.current.set(localId, controller);
 
@@ -369,9 +376,10 @@ export function useComposerAttachments(workspaceId: string) {
               : item,
           ),
         );
+        return attachment;
       } catch (error) {
         // An abort is the thumbnail having been removed, not a failure.
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) return null;
         const description = await errorMessage(error, "The upload failed.");
         setItems((current) =>
           current.map((item) =>
@@ -383,6 +391,7 @@ export function useComposerAttachments(workspaceId: string) {
         toast.error(`${file.name} could not be attached`, {
           description,
         });
+        return null;
       } finally {
         uploadsRef.current.delete(localId);
       }
@@ -419,6 +428,7 @@ export function useComposerAttachments(workspaceId: string) {
       const started = accepted.map((file) => ({
         localId: crypto.randomUUID(),
         fileName: file.name,
+        kind: "image" as const,
         previewUrl: URL.createObjectURL(file),
         status: "uploading" as const,
         attachment: null,
@@ -427,6 +437,39 @@ export function useComposerAttachments(workspaceId: string) {
 
       setItems((current) => [...current, ...started]);
       started.forEach((item, index) => void upload(item.localId, accepted[index]));
+    },
+    [items.length, upload],
+  );
+
+  /**
+   * A clip recorded in the composer, attached the same way an image is.
+   *
+   * Awaited rather than fired and forgotten, because the transcript is fetched
+   * against the stored attachment: the caller needs the row before it can ask
+   * for the text.
+   */
+  const addRecording = useCallback(
+    async (file: File): Promise<MessageAttachment | null> => {
+      if (items.length >= MAX_TURN_ATTACHMENTS) {
+        toast.error(`A question carries at most ${MAX_TURN_ATTACHMENTS} files.`);
+        return null;
+      }
+
+      const localId = crypto.randomUUID();
+      setItems((current) => [
+        ...current,
+        {
+          localId,
+          fileName: file.name,
+          kind: "audio",
+          previewUrl: URL.createObjectURL(file),
+          status: "uploading",
+          attachment: null,
+          error: null,
+        },
+      ]);
+
+      return upload(localId, file);
     },
     [items.length, upload],
   );
@@ -454,22 +497,40 @@ export function useComposerAttachments(workspaceId: string) {
   );
 
   /**
-   * Empty the strip after a send. Deliberately not a delete: the images now
-   * belong to the message that was just sent.
+   * Empty the strip after a send. Deliberately not a delete for an image: it now
+   * belongs to the message that was just sent.
+   *
+   * A recording is the exception. A turn carries images only — the send refuses
+   * any other kind — so the clip went up to be transcribed and nothing will ever
+   * refer to it again; leaving it would be storage nobody can reach.
    */
   const clear = useCallback(() => {
-    for (const item of items) URL.revokeObjectURL(item.previewUrl);
+    for (const item of items) {
+      URL.revokeObjectURL(item.previewUrl);
+      if (item.kind === "audio" && item.attachment) {
+        void deleteAttachment(workspaceId, item.attachment.id).catch(() => {});
+      }
+    }
     setItems([]);
-  }, [items]);
+  }, [items, workspaceId]);
 
   return {
     items,
     add,
+    addRecording,
     remove,
     clear,
-    /** The ones a send can actually name. A failed upload is simply not among them. */
+    /**
+     * The ones a send can actually name. A failed upload is simply not among
+     * them, and neither is a recording: the backend accepts images on a message
+     * and refuses every other kind, so a clip would fail the whole turn. What a
+     * recording contributes is its transcript, which is by then ordinary text in
+     * the question.
+     */
     ready: items.flatMap((item) =>
-      item.status === "ready" && item.attachment ? [item.attachment] : [],
+      item.kind === "image" && item.status === "ready" && item.attachment
+        ? [item.attachment]
+        : [],
     ),
     uploading: items.some((item) => item.status === "uploading"),
     full: items.length >= MAX_TURN_ATTACHMENTS,

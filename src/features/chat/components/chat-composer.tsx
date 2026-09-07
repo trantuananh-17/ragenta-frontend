@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ArrowUp, ImagePlus, Square } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { ArrowUp, ImagePlus, Mic, Square, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -16,12 +17,18 @@ import type { ModelSelection } from "@/features/models/service/models.service";
 import { useWorkspaceId } from "@/features/workspace/components/workspace-provider";
 import { cn } from "@/lib/utils";
 import { useComposerAttachments } from "../hooks/chat.hook";
+import { useVoiceInput } from "../hooks/speech.hook";
 import {
   ACCEPTED_ATTACHMENT_TYPES,
   MAX_TURN_ATTACHMENTS,
   type MessageAttachment,
 } from "../service/chat.service";
 import { ComposerAttachments } from "./chat-attachments";
+
+/** m:ss, so a long recording still reads as a duration rather than a count. */
+function elapsed(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
 
 export interface ComposerSubmit {
   content: string;
@@ -73,8 +80,27 @@ export function ChatComposer({
   const [value, setValue] = useState("");
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
   const attachments = useComposerAttachments(workspaceId);
   const vision = useVisionSupport(workspaceId, model ?? null);
+
+  /*
+    A transcript lands in the box, not in the thread. It is a machine's reading
+    of what somebody said — routinely wrong about a name or a number — so the
+    person who said it gets to fix it before anyone is charged for an answer to
+    the wrong question. Appended rather than replacing: whatever was already
+    typed is theirs too.
+  */
+  const acceptTranscript = useCallback((text: string) => {
+    setValue((current) => (current.trim() ? `${current.trimEnd()} ${text}` : text));
+    textRef.current?.focus();
+  }, []);
+
+  const voice = useVoiceInput({
+    workspaceId,
+    attach: attachments.addRecording,
+    onTranscript: acceptTranscript,
+  });
 
   // Null is "not knowable yet", and the button stays available there: the
   // backend refuses a vision turn on a text-only model anyway, so a control
@@ -88,6 +114,18 @@ export function ChatComposer({
       ? `A question carries at most ${MAX_TURN_ATTACHMENTS} images.`
       : "Attach an image";
 
+  const recording = voice.status === "recording";
+  const mayRecord =
+    !disabled && !pending && voice.supported && voice.available && !attachments.full;
+
+  const recordLabel = !voice.supported
+    ? "This browser cannot record audio."
+    : !voice.available
+      ? "Voice input is not enabled on this deployment."
+      : attachments.full
+        ? `A question carries at most ${MAX_TURN_ATTACHMENTS} files.`
+        : "Record a question";
+
   const submit = () => {
     const content = value.trim();
     const ready = attachments.ready;
@@ -96,6 +134,9 @@ export function ChatComposer({
     // silently left behind.
     if ((!content && ready.length === 0) || pending || disabled) return;
     if (attachments.uploading) return;
+    // A transcript still on its way is part of this question; sending now would
+    // send the question without the words that were spoken into it.
+    if (recording || voice.busy) return;
 
     setValue("");
     attachments.clear();
@@ -147,6 +188,7 @@ export function ChatComposer({
       />
 
       <Textarea
+        ref={textRef}
         value={value}
         autoFocus={autoFocus}
         disabled={disabled}
@@ -187,6 +229,60 @@ export function ChatComposer({
             <TooltipContent>{attachLabel}</TooltipContent>
           </Tooltip>
 
+          {recording ? (
+            <div className="flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/5 py-0.5 pr-0.5 pl-2">
+              <span className="size-2 animate-pulse rounded-full bg-destructive" />
+              <span className="text-xs tabular-nums">{elapsed(voice.seconds)}</span>
+              <Button
+                type="button"
+                size="icon-xs"
+                variant="ghost"
+                aria-label="Discard recording"
+                onClick={voice.cancel}
+              >
+                <X className="size-3.5" />
+              </Button>
+              <Button
+                type="button"
+                size="icon-xs"
+                variant="secondary"
+                aria-label="Stop recording and transcribe"
+                onClick={voice.stop}
+              >
+                <Square className="size-3" />
+              </Button>
+            </div>
+          ) : voice.busy ? (
+            /*
+              Named, and never a bare spinner: transcription runs roughly in real
+              time on a self-hosted sidecar, so a minute of audio is a minute of
+              waiting, and an unlabelled composer that will not send reads as one
+              that has hung.
+            */
+            <span className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
+              <Spinner className="size-3.5" />
+              {voice.status === "uploading" ? "Uploading…" : "Transcribing…"}
+            </span>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex">
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    disabled={!mayRecord}
+                    aria-label={recordLabel}
+                    onClick={() => void voice.start()}
+                  >
+                    <Mic className="size-4" />
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{recordLabel}</TooltipContent>
+            </Tooltip>
+          )}
+
           {toolbar}
         </div>
 
@@ -210,6 +306,8 @@ export function ChatComposer({
               disabled ||
               pending ||
               attachments.uploading ||
+              recording ||
+              voice.busy ||
               (value.trim().length === 0 && attachments.ready.length === 0)
             }
             aria-label="Send"

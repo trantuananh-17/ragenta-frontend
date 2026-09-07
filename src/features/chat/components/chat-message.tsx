@@ -9,6 +9,7 @@ import { formatCredits, formatDateTime } from "@/lib/format";
 import type { Citation, Message } from "../service/chat.service";
 import { MessageAttachments } from "./chat-attachments";
 import { SourceList, withCitations } from "./citations";
+import { ReadAloudButton } from "./read-aloud";
 
 /**
  * Markdown for an answer.
@@ -217,21 +218,24 @@ export function ChatMessage({
         </p>
       )}
 
-      <p
-        title={answerTitle(message.createdAt, askedAt)}
-        className="pt-1 text-[11px] text-muted-foreground tabular-nums"
-      >
-        {message.model && (
-          <>
-            {message.model} · {formatCredits(Math.round(message.credits))}{" "}
-            credits ·{" "}
-          </>
-        )}
-        <time dateTime={message.createdAt}>{clockTime(message.createdAt)}</time>
-        {elapsedSeconds(message.createdAt, askedAt) !== null && (
-          <> · {elapsedSeconds(message.createdAt, askedAt)}s</>
-        )}
-      </p>
+      <div className="flex items-center gap-1.5 pt-1">
+        <ReadAloudButton content={message.content} />
+        <p
+          title={answerTitle(message.createdAt, askedAt)}
+          className="text-[11px] text-muted-foreground tabular-nums"
+        >
+          {message.model && (
+            <>
+              {message.model} · {formatCredits(Math.round(message.credits))}{" "}
+              credits ·{" "}
+            </>
+          )}
+          <time dateTime={message.createdAt}>{clockTime(message.createdAt)}</time>
+          {elapsedSeconds(message.createdAt, askedAt) !== null && (
+            <> · {elapsedSeconds(message.createdAt, askedAt)}s</>
+          )}
+        </p>
+      </div>
     </div>
   );
 }
