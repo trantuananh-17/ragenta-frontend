@@ -36,6 +36,34 @@ export function useModelSettings(workspaceId: string) {
   return useQuery(modelsOptions.settings(workspaceId));
 }
 
+/**
+ * Whether the model a turn will actually run can read images.
+ *
+ * `null` means not knowable yet — the catalogue or the workspace default has
+ * not arrived, or the resolved model is not in the catalogue at all. Callers
+ * stay permissive there rather than guessing: the backend refuses a vision turn
+ * on a text-only model before the stream opens, so a wrongly greyed-out control
+ * is the worse of the two failures.
+ */
+export function useVisionSupport(
+  workspaceId: string,
+  selection: ModelSelection | null,
+): boolean | null {
+  const catalogue = useModelCatalogue(workspaceId);
+  const settings = useModelSettings(workspaceId);
+
+  // No per-turn override means the workspace's own chat model answers the turn.
+  const resolved = selection ?? settings.data?.chat ?? null;
+  if (!resolved || !catalogue.data) return null;
+
+  const model = catalogue.data.models.find(
+    (candidate) =>
+      candidate.provider === resolved.provider &&
+      candidate.model === resolved.model,
+  );
+  return model ? model.vision : null;
+}
+
 export function useUpdateModelSettings(workspaceId: string) {
   const queryClient = useQueryClient();
 

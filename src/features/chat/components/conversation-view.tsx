@@ -34,7 +34,14 @@ import {
   ProjectPicker,
   RetrievalSettingsPicker,
 } from "./retrieval-pickers";
-import type { SearchMode } from "../service/chat.service";
+import type { MessageAttachment, SearchMode } from "../service/chat.service";
+
+/** Omitted rather than empty, so a turn without images sends no key at all. */
+function attachmentIds(attachments: MessageAttachment[]): string[] | undefined {
+  return attachments.length > 0
+    ? attachments.map((attachment) => attachment.id)
+    : undefined;
+}
 
 /**
  * One thread.
@@ -74,10 +81,14 @@ export function ConversationView({ conversationId }: { conversationId: string })
   useEffect(() => {
     const question = takePendingQuestion(conversationId);
     if (!question) return;
-    void send({
-      content: question.content,
-      model: question.model ?? undefined,
-    });
+    void send(
+      {
+        content: question.content,
+        model: question.model ?? undefined,
+        attachmentIds: attachmentIds(question.attachments),
+      },
+      question.attachments,
+    );
     // Runs once per conversation; `send` is stable per conversation id.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
@@ -182,12 +193,17 @@ export function ConversationView({ conversationId }: { conversationId: string })
             onStop={stop}
             disabled={!mayChat}
             disabledReason="Your role in this workspace can read but not spend its credits."
-            onSubmit={({ content }) =>
-              void send({
-                content,
-                model: model ?? undefined,
-                documentIds: documentIds.length > 0 ? documentIds : undefined,
-              })
+            model={model}
+            onSubmit={({ content, attachments }) =>
+              void send(
+                {
+                  content,
+                  model: model ?? undefined,
+                  documentIds: documentIds.length > 0 ? documentIds : undefined,
+                  attachmentIds: attachmentIds(attachments),
+                },
+                attachments,
+              )
             }
             toolbar={
               <>

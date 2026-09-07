@@ -1,3 +1,5 @@
+import type { MessageAttachment } from "../service/chat.service";
+
 /**
  * The question typed on the blank-slate screen, handed to the conversation
  * screen that the create then navigates to.
@@ -14,6 +16,12 @@ export interface PendingQuestion {
   content: string;
   /** A model chosen on the blank slate applies to the turn it was chosen for. */
   model: { provider: string; model: string } | null;
+  /**
+   * Images attached before the conversation existed. Already uploaded, and this
+   * map holds the objects rather than serialising them, so they survive the
+   * navigation intact and the first turn carries them.
+   */
+  attachments: MessageAttachment[];
 }
 
 const pending = new Map<string, PendingQuestion>();

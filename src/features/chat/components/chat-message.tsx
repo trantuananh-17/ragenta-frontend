@@ -7,6 +7,7 @@ import { AlertTriangle, CircleStop } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCredits, formatDateTime } from "@/lib/format";
 import type { Citation, Message } from "../service/chat.service";
+import { MessageAttachments } from "./chat-attachments";
 import { SourceList, withCitations } from "./citations";
 
 /**
@@ -174,13 +175,20 @@ export function ChatMessage({
 }) {
   if (message.role === "user") {
     return (
-      <div className="flex justify-end">
-        <div
-          title={`Sent ${formatDateTime(message.createdAt)}`}
-          className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm whitespace-pre-wrap text-primary-foreground"
-        >
-          {message.content}
-        </div>
+      <div className="flex flex-col items-end gap-2">
+        <MessageAttachments attachments={message.attachments} />
+        {/*
+          An image on its own is a whole question — "what is this?" — so an empty
+          bubble under it is suppressed rather than rendered as a coloured sliver.
+        */}
+        {message.content && (
+          <div
+            title={`Sent ${formatDateTime(message.createdAt)}`}
+            className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm whitespace-pre-wrap text-primary-foreground"
+          >
+            {message.content}
+          </div>
+        )}
       </div>
     );
   }

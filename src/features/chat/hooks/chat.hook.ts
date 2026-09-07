@@ -14,13 +14,18 @@ import { workspaceKeys } from "@/features/workspace/options/workspace.options";
 import { chatKeys, chatOptions } from "../options/chat.options";
 import {
   createConversation,
+  deleteAttachment,
   deleteConversation,
   stopMessage,
   streamMessage,
   updateConversation,
+  uploadAttachment,
+  MAX_ATTACHMENT_BYTES,
+  MAX_TURN_ATTACHMENTS,
   type Citation,
   type CreateConversationInput,
   type Message,
+  type MessageAttachment,
   type SendMessageInput,
   type UpdateConversationInput,
 } from "../service/chat.service";
@@ -133,6 +138,10 @@ function localMessage(
   conversationId: string,
   role: Message["role"],
   content: string,
+  // Carried on the optimistic row, not left for the reconcile: an image that
+  // appeared only after the invalidate would flash in halfway through the
+  // answer it was asked about.
+  attachments: MessageAttachment[],
 ): Message {
   return {
     id: `local-${crypto.randomUUID()}`,
@@ -140,6 +149,7 @@ function localMessage(
     role,
     content,
     citations: [],
+    attachments,
     provider: null,
     model: null,
     inputTokens: 0,
@@ -205,7 +215,15 @@ export function useSendMessage(workspaceId: string, conversationId: string) {
   }, [conversationId, workspaceId]);
 
   const send = useCallback(
-    async (input: SendMessageInput) => {
+    async (
+      input: SendMessageInput,
+      /**
+       * The uploaded images `input.attachmentIds` names. Passed alongside rather
+       * than inside the payload because the wire carries ids and the optimistic
+       * bubble needs the files themselves.
+       */
+      attachments: MessageAttachment[] = [],
+    ) => {
       if (pending) return;
 
       const controller = new AbortController();
@@ -230,7 +248,7 @@ export function useSendMessage(workspaceId: string, conversationId: string) {
                 ...current,
                 items: [
                   ...current.items,
-                  localMessage(conversationId, "user", input.content),
+                  localMessage(conversationId, "user", input.content, attachments),
                 ],
                 total: current.total + 1,
               }
@@ -303,4 +321,157 @@ export function useSendMessage(workspaceId: string, conversationId: string) {
   );
 
   return { send, stop, streaming, pending };
+}
+
+/** One image in the composer, from the moment it is chosen. */
+export interface ComposerAttachment {
+  /** Stable for the life of the thumbnail; the server id only arrives later. */
+  localId: string;
+  fileName: string;
+  /** An object URL over the chosen file, so the thumbnail is there at once. */
+  previewUrl: string;
+  status: "uploading" | "ready" | "failed";
+  /** Set once the upload has landed. What the send actually refers to. */
+  attachment: MessageAttachment | null;
+  error: string | null;
+}
+
+/**
+ * The images attached to the next question.
+ *
+ * Uploaded on selection rather than on send, which is what the two-step backend
+ * contract is for: the slow part happens while the question is still being
+ * typed, and pressing send stays a small JSON request. A failure is therefore
+ * visible on its own thumbnail long before anyone commits to the turn, and it
+ * takes only itself down — the rest of the batch still sends.
+ */
+export function useComposerAttachments(workspaceId: string) {
+  const [items, setItems] = useState<ComposerAttachment[]>([]);
+  // Keyed by localId so removing a thumbnail can cancel the upload behind it,
+  // which is what stops a removed image from being stored anyway.
+  const uploadsRef = useRef(new Map<string, AbortController>());
+
+  const upload = useCallback(
+    async (localId: string, file: File) => {
+      const controller = new AbortController();
+      uploadsRef.current.set(localId, controller);
+
+      try {
+        const attachment = await uploadAttachment(
+          workspaceId,
+          file,
+          controller.signal,
+        );
+        setItems((current) =>
+          current.map((item) =>
+            item.localId === localId
+              ? { ...item, status: "ready", attachment, error: null }
+              : item,
+          ),
+        );
+      } catch (error) {
+        // An abort is the thumbnail having been removed, not a failure.
+        if (controller.signal.aborted) return;
+        const description = await errorMessage(error, "The upload failed.");
+        setItems((current) =>
+          current.map((item) =>
+            item.localId === localId
+              ? { ...item, status: "failed", error: description }
+              : item,
+          ),
+        );
+        toast.error(`${file.name} could not be attached`, {
+          description,
+        });
+      } finally {
+        uploadsRef.current.delete(localId);
+      }
+    },
+    [workspaceId],
+  );
+
+  const add = useCallback(
+    (files: File[]) => {
+      if (files.length === 0) return;
+
+      const room = MAX_TURN_ATTACHMENTS - items.length;
+      if (room <= 0) {
+        toast.error(`A question carries at most ${MAX_TURN_ATTACHMENTS} images.`);
+        return;
+      }
+      if (files.length > room) {
+        toast.error(`Only ${room} more image${room === 1 ? "" : "s"} fit on this question.`);
+      }
+
+      // Refused here as well as on the server: the server refusal is the one
+      // that counts, but making someone upload 40 MB to be told no is a poor
+      // way to spend their connection.
+      const chosen = files.slice(0, room);
+      for (const file of chosen.filter((file) => file.size > MAX_ATTACHMENT_BYTES)) {
+        toast.error(`${file.name} is too large`, {
+          description: `The limit is ${Math.floor(MAX_ATTACHMENT_BYTES / 1024 / 1024)} MB per image.`,
+        });
+      }
+
+      const accepted = chosen.filter((file) => file.size <= MAX_ATTACHMENT_BYTES);
+      if (accepted.length === 0) return;
+
+      const started = accepted.map((file) => ({
+        localId: crypto.randomUUID(),
+        fileName: file.name,
+        previewUrl: URL.createObjectURL(file),
+        status: "uploading" as const,
+        attachment: null,
+        error: null,
+      }));
+
+      setItems((current) => [...current, ...started]);
+      started.forEach((item, index) => void upload(item.localId, accepted[index]));
+    },
+    [items.length, upload],
+  );
+
+  const remove = useCallback(
+    (localId: string) => {
+      const item = items.find((candidate) => candidate.localId === localId);
+      if (!item) return;
+
+      uploadsRef.current.get(localId)?.abort();
+      uploadsRef.current.delete(localId);
+      URL.revokeObjectURL(item.previewUrl);
+      // Best effort: an attachment not yet bound to a message is deleted, and
+      // one the send has already claimed answers 409, which is not a problem
+      // worth telling anyone about — it belongs to the message now.
+      if (item.attachment) {
+        void deleteAttachment(workspaceId, item.attachment.id).catch(() => {});
+      }
+
+      setItems((current) =>
+        current.filter((candidate) => candidate.localId !== localId),
+      );
+    },
+    [items, workspaceId],
+  );
+
+  /**
+   * Empty the strip after a send. Deliberately not a delete: the images now
+   * belong to the message that was just sent.
+   */
+  const clear = useCallback(() => {
+    for (const item of items) URL.revokeObjectURL(item.previewUrl);
+    setItems([]);
+  }, [items]);
+
+  return {
+    items,
+    add,
+    remove,
+    clear,
+    /** The ones a send can actually name. A failed upload is simply not among them. */
+    ready: items.flatMap((item) =>
+      item.status === "ready" && item.attachment ? [item.attachment] : [],
+    ),
+    uploading: items.some((item) => item.status === "uploading"),
+    full: items.length >= MAX_TURN_ATTACHMENTS,
+  };
 }

@@ -21,6 +21,16 @@ export const catalogueModelSchema = z.object({
    * fails to parse and five screens lose their model pickers.
    */
   contextWindow: z.number().nullish().default(null),
+  /**
+   * Whether the model reads images in a user message. It is a flag rather than
+   * a fourth `capability` precisely so that adding it could not break the enum
+   * above — a vision model is still a chat model.
+   *
+   * `.catch(false)` rather than a bare boolean: during a rollout this bundle can
+   * be newer than the backend serving it, and a catalogue without the key must
+   * cost one greyed-out attach button, not every model picker in the app.
+   */
+  vision: z.boolean().catch(false),
   configured: z.boolean(),
   entitled: z.boolean(),
   selectable: z.boolean(),

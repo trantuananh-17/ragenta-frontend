@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { api } from "@/lib/ky";
+import { api, apiUrl } from "@/lib/ky";
 import { pageSchema } from "@/lib/pagination";
 import { readSse } from "@/lib/sse";
 import { redirectToLogin, responseErrorMessage } from "@/lib/unauthorized";
@@ -57,12 +57,41 @@ export const conversationSchema = z.object({
   knowledgeBaseName: z.string().nullable().optional(),
 });
 
+/**
+ * An image carried by a turn, as every message lists it.
+ *
+ * No storage key: the backend never hands one out, and the bytes are addressed
+ * through `attachmentContentUrl` instead. The pixel size is what a thumbnail
+ * reserves its box with, and is null when the file's header did not give one.
+ */
+export const messageAttachmentSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  fileName: z.string(),
+  mimeType: z.string(),
+  width: z.number().nullable().default(null),
+  height: z.number().nullable().default(null),
+});
+
+/** What an upload answers with: the summary above, plus what only its uploader needs. */
+export const attachmentSchema = messageAttachmentSchema.extend({
+  conversationId: z.string().nullable(),
+  messageId: z.string().nullable(),
+  sizeBytes: z.number(),
+  status: z.string(),
+  error: z.string().nullable(),
+  createdAt: z.coerce.string(),
+});
+
 export const messageSchema = z.object({
   id: z.string(),
   conversationId: z.string(),
   role: z.enum(["user", "assistant"]),
   content: z.string(),
   citations: z.array(citationSchema).default([]),
+  // Defaulted, not required: a server that predates attachments answers without
+  // the key, and one missing field must not empty a whole transcript.
+  attachments: z.array(messageAttachmentSchema).default([]),
   provider: z.string().nullable(),
   model: z.string().nullable(),
   inputTokens: z.number(),
@@ -79,6 +108,8 @@ export const conversationsPageSchema = pageSchema(conversationSchema);
 export const messagesPageSchema = pageSchema(messageSchema);
 
 export type Citation = z.infer<typeof citationSchema>;
+export type MessageAttachment = z.infer<typeof messageAttachmentSchema>;
+export type Attachment = z.infer<typeof attachmentSchema>;
 export type Conversation = z.infer<typeof conversationSchema>;
 export type Message = z.infer<typeof messageSchema>;
 
@@ -206,9 +237,88 @@ export async function deleteConversation(
   await api.delete(`workspaces/${workspaceId}/conversations/${conversationId}`);
 }
 
+/** The backend refuses anything larger before it stores a byte. */
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+/**
+ * What the file picker offers. A hint only — the server decides the type from
+ * the file's own first bytes, so a renamed `.exe` is refused there whatever this
+ * attribute let someone choose.
+ */
+export const ACCEPTED_ATTACHMENT_TYPES = "image/png,image/jpeg,image/webp,image/gif";
+
+/** `sendMessageSchema` caps a turn at six images, and so does the composer. */
+export const MAX_TURN_ATTACHMENTS = 6;
+
+/**
+ * The bytes of one attachment, addressed directly.
+ *
+ * The endpoint answers 302 to a short-lived presigned URL, which is why this is
+ * a URL rather than a fetch: the browser sends the session cookie to our own
+ * origin, follows the redirect itself, and the image loads without the bytes
+ * ever passing through JavaScript. Usable as an `<img src>` as it stands.
+ */
+export function attachmentContentUrl(
+  workspaceId: string,
+  attachmentId: string,
+): string {
+  return apiUrl(`workspaces/${workspaceId}/attachments/${attachmentId}/content`);
+}
+
+/**
+ * Upload one image, before the turn that will carry it exists.
+ *
+ * Two steps rather than a multipart send: the image is stored and validated
+ * while the question is still being typed, so pressing send stays a small JSON
+ * request that either starts a stream or is refused outright. Raw fetch rather
+ * than ky so the browser sets the multipart boundary itself — a hand-written
+ * content-type header is the classic way to make a multipart upload fail.
+ */
+export async function uploadAttachment(
+  workspaceId: string,
+  file: File,
+  signal?: AbortSignal,
+): Promise<Attachment> {
+  const form = new FormData();
+  form.append("file", file);
+
+  const response = await fetch(apiUrl(`workspaces/${workspaceId}/attachments`), {
+    method: "POST",
+    body: form,
+    signal,
+  });
+
+  if (!response.ok) {
+    // Outside the ky client, so the shared 401 handling has to be asked for.
+    if (response.status === 401) redirectToLogin();
+    throw new Error(
+      await responseErrorMessage(response, `Upload failed (${response.status}).`),
+    );
+  }
+
+  return attachmentSchema.parse(await response.json());
+}
+
+/**
+ * Drop an attachment that was never sent.
+ *
+ * Only that case: once the image is bound to a message the backend answers 409,
+ * because a sent question and the image it asks about are one thing. Removing a
+ * thumbnail from the composer is therefore the only caller.
+ */
+export async function deleteAttachment(
+  workspaceId: string,
+  attachmentId: string,
+): Promise<void> {
+  await api.delete(`workspaces/${workspaceId}/attachments/${attachmentId}`);
+}
+
 /** What one turn can carry beyond the question itself. */
 export interface SendMessageInput {
+  /** May be empty, but only when the turn carries attachments. */
   content: string;
+  /** Images already uploaded, in the order they were attached. */
+  attachmentIds?: string[];
   /** Narrows retrieval to specific documents. Empty means every document. */
   documentIds?: string[];
   model?: { provider: string; model: string };

@@ -55,12 +55,15 @@ export function NewChat() {
         pending={create.isPending}
         disabled={!mayChat}
         disabledReason="Your role in this workspace can read but not spend its credits."
-        onSubmit={({ content }) =>
+        model={model}
+        onSubmit={({ content, attachments }) =>
           create.mutate(
             {
               // The first line of the question, so the sidebar reads as a list
-              // of questions rather than a list of "New conversation".
-              title: content.slice(0, 80),
+              // of questions rather than a list of "New conversation". A question
+              // that is only an image has no first line, so it is named after
+              // the image instead of being left blank.
+              title: content.slice(0, 80) || attachments[0]?.fileName,
               knowledgeBaseId,
               projectId,
             },
@@ -68,7 +71,11 @@ export function NewChat() {
               // Handed to the conversation screen, which sends it as soon as
               // it mounts.
               onSuccess: (conversation) =>
-                setPendingQuestion(conversation.id, { content, model }),
+                setPendingQuestion(conversation.id, {
+                  content,
+                  model,
+                  attachments,
+                }),
             },
           )
         }
