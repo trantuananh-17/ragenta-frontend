@@ -39,6 +39,8 @@ export const agentVersionSchema = z.object({
   maxRounds: z.number().default(1),
   /** Null bounds a run by maxRounds alone. numeric arrives as a string. */
   creditCeiling: z.coerce.number().nullable().default(null),
+  /** A flow, when this version is one. Null means a single prompt. */
+  graph: z.unknown().nullable().default(null),
   createdBy: z.string().nullable(),
   createdAt: z.coerce.string(),
 });
@@ -129,6 +131,8 @@ export interface AgentConfigInput {
   maxRounds?: number;
   /** The most credits one run may spend before it is stopped. */
   creditCeiling?: number | null;
+  /** A flow. Null keeps the version a single prompt. */
+  graph?: unknown;
 }
 
 export async function getAgents(workspaceId: string, limit = 50) {
@@ -262,6 +266,7 @@ function configPayload(config: AgentConfigInput) {
     tools: config.tools ?? [],
     maxRounds: config.maxRounds ?? 1,
     creditCeiling: config.creditCeiling ?? null,
+    graph: config.graph ?? null,
   };
 }
 
@@ -295,6 +300,38 @@ export async function stopAgentRun(
   await api.post(`workspaces/${workspaceId}/agent-runs/${runId}/stop`);
 }
 
+/**
+ * Answer what a paused flow asked for and carry on.
+ *
+ * The same stream shape a run opens, on the same run: it is one execution that
+ * happened to wait for a person in the middle.
+ */
+export async function* resumeAgentRun(
+  workspaceId: string,
+  runId: string,
+  answers: Record<string, string>,
+  signal?: AbortSignal,
+): AsyncGenerator<AgentStreamEvent> {
+  const response = await fetch(
+    `/api/v1/workspaces/${workspaceId}/agent-runs/${runId}/resume`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ answers }),
+      signal,
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) redirectToLogin();
+    throw new Error(
+      await responseErrorMessage(response, "The run could not be resumed."),
+    );
+  }
+
+  yield* readEvents(response, signal);
+}
+
 export interface RunAgentInput {
   input: string;
   /** Narrows retrieval to specific documents. Empty means every document. */
@@ -310,6 +347,16 @@ export type AgentStreamEvent =
   | { type: "warning"; message: string }
   /** Which round of the tool loop is running. Absent for an agent with no tools. */
   | { type: "round"; round: number; of: number }
+  | { type: "node_started"; nodeId: string; label: string; nodeType: string }
+  | { type: "node_finished"; nodeId: string; label: string; ok: boolean }
+  /** The flow is waiting for a person. The stream ends here until it resumes. */
+  | {
+      type: "awaiting_input";
+      runId: string;
+      nodeId: string;
+      prompt: string;
+      fields: string[];
+    }
   | { type: "tool_started"; seq: number; name: string; arguments: string }
   | {
       type: "tool_finished";
@@ -322,7 +369,7 @@ export type AgentStreamEvent =
   | {
       type: "done";
       runId: string;
-      status: "succeeded" | "failed" | "stopped";
+      status: "succeeded" | "failed" | "stopped" | "awaiting_input";
       credits: number;
       usage: { input: number; output: number };
     }
@@ -342,6 +389,25 @@ const streamEventSchema = z.discriminatedUnion("type", [
     of: z.number(),
   }),
   z.object({
+    type: z.literal("node_started"),
+    nodeId: z.string(),
+    label: z.string(),
+    nodeType: z.string(),
+  }),
+  z.object({
+    type: z.literal("node_finished"),
+    nodeId: z.string(),
+    label: z.string(),
+    ok: z.boolean(),
+  }),
+  z.object({
+    type: z.literal("awaiting_input"),
+    runId: z.string(),
+    nodeId: z.string(),
+    prompt: z.string(),
+    fields: z.array(z.string()),
+  }),
+  z.object({
     type: z.literal("tool_started"),
     seq: z.number(),
     name: z.string(),
@@ -358,7 +424,7 @@ const streamEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("done"),
     runId: z.string(),
-    status: z.enum(["succeeded", "failed", "stopped"]),
+    status: z.enum(["succeeded", "failed", "stopped", "awaiting_input"]),
     credits: z.number(),
     usage: z.object({ input: z.number(), output: z.number() }),
   }),
@@ -398,10 +464,21 @@ export async function* streamAgentRun(
     );
   }
 
+  yield* readEvents(response, signal);
+}
+
+/**
+ * Decodes one run's frames.
+ *
+ * Both the parse and the schema check are non-fatal. A frame truncated by a
+ * dropped connection, or an event type a later server adds, must not throw and
+ * discard an answer that is already half on screen.
+ */
+async function* readEvents(
+  response: Response,
+  signal?: AbortSignal,
+): AsyncGenerator<AgentStreamEvent> {
   for await (const frame of readSse(response, signal)) {
-    // Both the parse and the schema check are non-fatal. A frame truncated by a
-    // dropped connection, or an event type a later server adds, must not throw
-    // and discard an answer that is already half on screen.
     let payload: unknown;
     try {
       payload = JSON.parse(frame.data);

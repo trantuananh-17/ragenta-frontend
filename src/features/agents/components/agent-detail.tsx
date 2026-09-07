@@ -23,10 +23,13 @@ import { canContribute } from "@/lib/workspace";
 import {
   useAgentRunsSuspense,
   useAgentSuspense,
+  useAgentTools,
   useDeleteAgent,
   usePublishVersion,
   useUpdateAgent,
 } from "../hooks/agents.hook";
+import { FlowEditor } from "../flow/flow-editor";
+import { emptyGraph, type AgentGraph } from "../flow/graph-model";
 import { AgentConfigForm } from "./agent-config-form";
 import { AgentRunPanel } from "./agent-run-panel";
 import { AgentStatusBadge } from "./agents-list";
@@ -39,10 +42,17 @@ export function AgentDetail({ agentId }: { agentId: string }) {
   const update = useUpdateAgent(workspace.id, agentId);
   const publish = usePublishVersion(workspace.id, agentId);
   const remove = useDeleteAgent(workspace.id);
+  const { data: tools } = useAgentTools(workspace.id);
   const [confirming, setConfirming] = useState(false);
+
+  const stored = (agent.config?.graph ?? null) as AgentGraph | null;
+  // Held locally while it is being edited, because a graph is dragged into shape
+  // over many small changes and publishing a version per drag would be absurd.
+  const [draft, setDraft] = useState<AgentGraph | null>(stored);
 
   const mayEdit = canContribute(workspace.role);
   const active = agent.status === "active";
+  const isFlow = stored !== null;
 
   return (
     <DetailShell>
@@ -82,6 +92,10 @@ export function AgentDetail({ agentId }: { agentId: string }) {
         <TabsList>
           <TabsTrigger value="run">Run</TabsTrigger>
           <TabsTrigger value="configuration">Configuration</TabsTrigger>
+          <TabsTrigger value="flow">
+            Flow
+            {isFlow && <span className="ml-1.5 text-muted-foreground">on</span>}
+          </TabsTrigger>
           <TabsTrigger value="history">
             History
             {runs.total > 0 && (
@@ -113,6 +127,73 @@ export function AgentDetail({ agentId }: { agentId: string }) {
               submitLabel="Publish new version"
               onSubmit={(config) => publish.mutate(config)}
             />
+          </DetailSection>
+        </TabsContent>
+
+        <TabsContent value="flow" className="mt-4">
+          <DetailSection
+            title="Flow"
+            description="Steps the agent runs in order, branching where you say. A flow replaces the single prompt on the Configuration tab; publishing one is what turns this agent into a flow."
+            actions={
+              draft ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!mayEdit}
+                  onClick={() => setDraft(null)}
+                >
+                  Discard flow
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!mayEdit}
+                  onClick={() => setDraft(emptyGraph())}
+                >
+                  Start a flow
+                </Button>
+              )
+            }
+          >
+            {draft ? (
+              <FlowEditor
+                graph={draft}
+                toolIds={(tools ?? []).map((tool) => tool.id)}
+                disabled={!mayEdit}
+                pending={publish.isPending}
+                onChange={setDraft}
+                onPublish={() =>
+                  agent.config &&
+                  publish.mutate({
+                    instructions: agent.config.instructions,
+                    model:
+                      agent.config.provider && agent.config.model
+                        ? {
+                            provider: agent.config.provider,
+                            model: agent.config.model,
+                          }
+                        : null,
+                    temperature: agent.config.temperature,
+                    maxOutputTokens: agent.config.maxOutputTokens,
+                    knowledgeBaseIds: agent.config.knowledgeBaseIds,
+                    searchMode: agent.config.searchMode as "hybrid",
+                    topK: agent.config.topK,
+                    groundedOnly: agent.config.groundedOnly,
+                    tools: agent.config.tools,
+                    maxRounds: agent.config.maxRounds,
+                    creditCeiling: agent.config.creditCeiling,
+                    graph: draft,
+                  })
+                }
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                This agent answers with one prompt. Start a flow when it needs to do
+                several things in order — search, then decide, then ask someone —
+                rather than one.
+              </p>
+            )}
           </DetailSection>
         </TabsContent>
 

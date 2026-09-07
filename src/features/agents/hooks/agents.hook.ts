@@ -17,10 +17,12 @@ import {
   createAgent,
   deleteAgent,
   publishAgentVersion,
+  resumeAgentRun,
   stopAgentRun,
   streamAgentRun,
   updateAgent,
   type AgentConfigInput,
+  type AgentStreamEvent,
   type CreateAgentInput,
   type RunAgentInput,
   type UpdateAgentInput,
@@ -144,12 +146,18 @@ export function useDeleteAgent(workspaceId: string) {
   });
 }
 
-/** One tool call, as the timeline shows it while the run is still going. */
+/**
+ * One thing the run did, as the timeline shows it while the run is still going.
+ *
+ * Tool calls and flow steps share the row shape because they read the same way
+ * to whoever is watching: something started, and then it did or did not work.
+ */
 export interface TimelineEntry {
-  seq: number;
+  kind: "tool" | "node";
+  key: string;
   name: string;
-  arguments: string;
-  /** Undefined while the call is still running. */
+  detail: string;
+  /** Undefined while it is still running. */
   ok?: boolean;
   summary?: string;
 }
@@ -165,6 +173,8 @@ export interface StreamingRun {
   /** Null for an agent with no tools, which never reports a round. */
   round: { round: number; of: number } | null;
   timeline: TimelineEntry[];
+  /** Set when a flow stopped at a step that asks a person. */
+  awaiting: { nodeId: string; prompt: string; fields: string[] } | null;
 }
 
 /**
@@ -205,6 +215,101 @@ export function useRunAgent(workspaceId: string, agentId: string) {
     });
   }, [workspaceId]);
 
+  /**
+   * One event, applied to what is on screen.
+   *
+   * Shared by starting a run and resuming a paused one: a resumed flow emits
+   * exactly the same events, and handling them twice would let the two drift.
+   */
+  const apply = useCallback((event: AgentStreamEvent) => {
+        if (event.type === "start") {
+          runIdRef.current = event.runId;
+          setStreaming((current) =>
+            current ? { ...current, runId: event.runId } : current,
+          );
+        } else if (event.type === "phase") {
+          setStreaming((current) =>
+            current ? { ...current, phase: event.phase } : current,
+          );
+        } else if (event.type === "citations") {
+          setStreaming((current) =>
+            current ? { ...current, citations: event.citations } : current,
+          );
+        } else if (event.type === "warning") {
+          setStreaming((current) =>
+            current ? { ...current, warning: event.message } : current,
+          );
+        } else if (event.type === "round") {
+          setStreaming((current) =>
+            current
+              ? { ...current, round: { round: event.round, of: event.of } }
+              : current,
+          );
+        } else if (event.type === "tool_started") {
+          setStreaming((current) =>
+            current
+              ? {
+                  ...current,
+                  timeline: [
+                    ...current.timeline,
+                    {
+                      kind: "tool",
+                      key: `tool-${event.seq}-${event.name}`,
+                      name: event.name,
+                      detail: event.arguments,
+                    },
+                  ],
+                }
+              : current,
+          );
+        } else if (event.type === "tool_finished") {
+          setStreaming((current) =>
+            current ? { ...current, timeline: close(current.timeline, "tool", event.name, event.ok, event.summary) } : current,
+          );
+        } else if (event.type === "node_started") {
+          setStreaming((current) =>
+            current
+              ? {
+                  ...current,
+                  timeline: [
+                    ...current.timeline,
+                    {
+                      kind: "node",
+                      key: `node-${event.nodeId}-${current.timeline.length}`,
+                      name: event.label,
+                      detail: event.nodeType,
+                    },
+                  ],
+                }
+              : current,
+          );
+        } else if (event.type === "node_finished") {
+          setStreaming((current) =>
+            current ? { ...current, timeline: close(current.timeline, "node", event.label, event.ok) } : current,
+          );
+        } else if (event.type === "awaiting_input") {
+          setStreaming((current) =>
+            current
+              ? {
+                  ...current,
+                  awaiting: {
+                    nodeId: event.nodeId,
+                    prompt: event.prompt,
+                    fields: event.fields,
+                  },
+                }
+              : current,
+          );
+        } else if (event.type === "delta") {
+          setStreaming((current) =>
+            current ? { ...current, output: current.output + event.text } : current,
+          );
+        } else if (event.type === "error") {
+          throw new Error(event.message);
+        }
+  }, []);
+
+
   const run = useCallback(
     async (input: RunAgentInput) => {
       if (pending) return;
@@ -222,6 +327,7 @@ export function useRunAgent(workspaceId: string, agentId: string) {
         stopping: false,
         round: null,
         timeline: [],
+        awaiting: null,
       });
 
       try {
@@ -231,69 +337,7 @@ export function useRunAgent(workspaceId: string, agentId: string) {
           input,
           controller.signal,
         )) {
-          if (event.type === "start") {
-            runIdRef.current = event.runId;
-            setStreaming((current) =>
-              current ? { ...current, runId: event.runId } : current,
-            );
-          } else if (event.type === "phase") {
-            setStreaming((current) =>
-              current ? { ...current, phase: event.phase } : current,
-            );
-          } else if (event.type === "citations") {
-            setStreaming((current) =>
-              current ? { ...current, citations: event.citations } : current,
-            );
-          } else if (event.type === "warning") {
-            setStreaming((current) =>
-              current ? { ...current, warning: event.message } : current,
-            );
-          } else if (event.type === "round") {
-            setStreaming((current) =>
-              current
-                ? { ...current, round: { round: event.round, of: event.of } }
-                : current,
-            );
-          } else if (event.type === "tool_started") {
-            setStreaming((current) =>
-              current
-                ? {
-                    ...current,
-                    timeline: [
-                      ...current.timeline,
-                      {
-                        seq: event.seq,
-                        name: event.name,
-                        arguments: event.arguments,
-                      },
-                    ],
-                  }
-                : current,
-            );
-          } else if (event.type === "tool_finished") {
-            setStreaming((current) =>
-              current
-                ? {
-                    ...current,
-                    timeline: current.timeline.map((entry) =>
-                      // Matched on the name as well as the sequence number: the
-                      // finished event is numbered one behind the started one,
-                      // and an entry silently updated to the wrong call would be
-                      // worse than one that never fills in.
-                      entry.ok === undefined && entry.name === event.name
-                        ? { ...entry, ok: event.ok, summary: event.summary }
-                        : entry,
-                    ),
-                  }
-                : current,
-            );
-          } else if (event.type === "delta") {
-            setStreaming((current) =>
-              current ? { ...current, output: current.output + event.text } : current,
-            );
-          } else if (event.type === "error") {
-            throw new Error(event.message);
-          }
+          apply(event);
         }
       } catch (error) {
         // An abort is the user pressing stop, not a failure.
@@ -309,8 +353,70 @@ export function useRunAgent(workspaceId: string, agentId: string) {
         });
       }
     },
-    [agentId, pending, queryClient, workspaceId],
+    [agentId, apply, pending, queryClient, workspaceId],
   );
 
-  return { run, stop, streaming, pending, clear: () => setStreaming(null) };
+  /**
+   * Answer what a paused flow asked and carry on, into the same on-screen run.
+   *
+   * Deliberately not a fresh `run`: the output already on screen belongs to this
+   * execution, and starting over would discard it and re-charge for it.
+   */
+  const resume = useCallback(
+    async (runId: string, answers: Record<string, string>) => {
+      if (pending) return;
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setPending(true);
+      setStreaming((current) => (current ? { ...current, awaiting: null } : current));
+
+      try {
+        for await (const event of resumeAgentRun(
+          workspaceId,
+          runId,
+          answers,
+          controller.signal,
+        )) {
+          apply(event);
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          toast.error("The run stopped", { description: await errorMessage(error) });
+        }
+      } finally {
+        abortRef.current = null;
+        setPending(false);
+        await queryClient.invalidateQueries({
+          queryKey: agentKeys.runs(workspaceId, agentId),
+        });
+      }
+    },
+    [agentId, apply, pending, queryClient, workspaceId],
+  );
+
+  return { run, resume, stop, streaming, pending, clear: () => setStreaming(null) };
+}
+
+/**
+ * Marks the most recent unfinished entry of a kind as done.
+ *
+ * Matched on the name as well, because a flow can run two steps with the same
+ * label and an entry filled in against the wrong one would be worse than one
+ * that never fills in at all.
+ */
+function close(
+  timeline: TimelineEntry[],
+  kind: TimelineEntry["kind"],
+  name: string,
+  ok: boolean,
+  summary?: string,
+): TimelineEntry[] {
+  const index = timeline.findLastIndex(
+    (entry) => entry.kind === kind && entry.name === name && entry.ok === undefined,
+  );
+  if (index < 0) return timeline;
+  return timeline.map((entry, position) =>
+    position === index ? { ...entry, ok, summary } : entry,
+  );
 }

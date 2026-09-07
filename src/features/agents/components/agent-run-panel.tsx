@@ -5,6 +5,8 @@ import { Check, Loader2, Play, Square, X } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AnswerBody } from "@/features/chat/components/chat-message";
 import { SourceList } from "@/features/chat/components/citations";
@@ -29,8 +31,10 @@ export function AgentRunPanel({
   disabled?: boolean;
 }) {
   const [input, setInput] = useState("");
-  const { run, stop, streaming, pending } = useRunAgent(workspaceId, agent.id);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const { run, resume, stop, streaming, pending } = useRunAgent(workspaceId, agent.id);
   const inactive = agent.status !== "active";
+  const awaiting = streaming?.awaiting ?? null;
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -95,7 +99,7 @@ export function AgentRunPanel({
           {streaming.timeline.length > 0 && (
             <ol className="space-y-1.5 border-l pl-3 text-xs">
               {streaming.timeline.map((entry) => (
-                <li key={`${entry.seq}-${entry.name}`} className="space-y-0.5">
+                <li key={entry.key} className="space-y-0.5">
                   <div className="flex items-center gap-1.5">
                     {entry.ok === undefined ? (
                       <Loader2 className="size-3 animate-spin text-muted-foreground" />
@@ -105,10 +109,17 @@ export function AgentRunPanel({
                       <X className="size-3 text-destructive" />
                     )}
                     <span className="font-medium">{entry.name}</span>
+                    {entry.kind === "node" && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {entry.detail}
+                      </span>
+                    )}
                   </div>
-                  <p className="truncate text-muted-foreground">
-                    {entry.summary ?? entry.arguments}
-                  </p>
+                  {(entry.summary || entry.kind === "tool") && (
+                    <p className="truncate text-muted-foreground">
+                      {entry.summary ?? entry.detail}
+                    </p>
+                  )}
                 </li>
               ))}
             </ol>
@@ -135,6 +146,43 @@ export function AgentRunPanel({
 
           {streaming.citations.length > 0 && (
             <SourceList citations={streaming.citations} />
+          )}
+
+          {awaiting && streaming.runId && (
+            <form
+              className="space-y-2 rounded-md border border-dashed p-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void resume(streaming.runId!, answers);
+                setAnswers({});
+              }}
+            >
+              <p className="text-sm">{awaiting.prompt}</p>
+              {awaiting.fields.map((field) => (
+                <div key={field} className="space-y-1">
+                  <Label htmlFor={`answer-${field}`} className="text-xs">
+                    {field}
+                  </Label>
+                  <Input
+                    id={`answer-${field}`}
+                    value={answers[field] ?? ""}
+                    onChange={(event) =>
+                      setAnswers((current) => ({
+                        ...current,
+                        [field]: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+              <Button
+                type="submit"
+                size="sm"
+                disabled={awaiting.fields.some((field) => !answers[field]?.trim())}
+              >
+                Continue
+              </Button>
+            </form>
           )}
         </div>
       )}
