@@ -45,6 +45,7 @@ const schema = z.object({
   topK: z.string(),
   groundedOnly: z.boolean(),
   tools: z.array(z.string()).max(8),
+  approveWrites: z.boolean(),
   maxRounds: z.string(),
   creditCeiling: z.string(),
 });
@@ -84,6 +85,7 @@ function defaultsFrom(version: AgentVersion | null | undefined): FormValues {
     topK: version?.topK === null || version?.topK === undefined ? "" : String(version.topK),
     groundedOnly: version?.groundedOnly ?? true,
     tools: version?.tools ?? [],
+    approveWrites: version?.approveWrites ?? true,
     maxRounds: String(version?.maxRounds ?? 1),
     creditCeiling:
       version?.creditCeiling === null || version?.creditCeiling === undefined
@@ -139,6 +141,10 @@ export function AgentConfigForm({
   const selectedSearchMode = useWatch({ control, name: "searchMode" });
   const groundedOnly = useWatch({ control, name: "groundedOnly" });
   const selectedTools = useWatch({ control, name: "tools" });
+  const approveWrites = useWatch({ control, name: "approveWrites" });
+  const picksWritingTool = (tools ?? []).some(
+    (tool) => tool.writes && selectedTools.includes(tool.id),
+  );
   const grounded = selectedBases.length > 0;
   // With the search tool the agent retrieves for itself, so the up-front
   // retrieval settings below no longer decide anything about a run.
@@ -155,6 +161,7 @@ export function AgentConfigForm({
       topK: optionalNumber(values.topK),
       groundedOnly: values.groundedOnly,
       tools: values.tools,
+      approveWrites: values.approveWrites,
       maxRounds: Number(values.maxRounds) || 1,
       creditCeiling: optionalNumber(values.creditCeiling),
     });
@@ -304,9 +311,20 @@ export function AgentConfigForm({
               />
               <span>
                 <span className="font-medium">{tool.title}</span>
+                {tool.writes && (
+                  <span className="ml-1.5 rounded bg-amber-500/10 px-1 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                    changes things
+                  </span>
+                )}
                 <span className="block text-xs text-muted-foreground">
                   {tool.description}
                 </span>
+                {tool.requires && (
+                  <span className="block text-[11px] text-muted-foreground">
+                    Needs the <code>{tool.requires}</code> connection configured by an
+                    administrator.
+                  </span>
+                )}
               </span>
             </label>
           ))}
@@ -321,6 +339,25 @@ export function AgentConfigForm({
           answering once. It can only call what is ticked here.
         </p>
       </div>
+
+      {picksWritingTool && (
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+          <div className="space-y-0.5">
+            <Label htmlFor="approveWrites">Ask before it changes anything</Label>
+            <p className="text-xs text-muted-foreground">
+              The run pauses and shows exactly what it is about to do. A tool that
+              only reads can be got wrong and cost a little; one that sends an email
+              gets it wrong once and it has happened.
+            </p>
+          </div>
+          <Switch
+            id="approveWrites"
+            disabled={disabled}
+            checked={approveWrites}
+            onCheckedChange={(checked) => form.setValue("approveWrites", checked)}
+          />
+        </div>
+      )}
 
       {selectedTools.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2">

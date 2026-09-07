@@ -41,6 +41,7 @@ export const agentVersionSchema = z.object({
   creditCeiling: z.coerce.number().nullable().default(null),
   /** A flow, when this version is one. Null means a single prompt. */
   graph: z.unknown().nullable().default(null),
+  approveWrites: z.boolean().default(true),
   createdBy: z.string().nullable(),
   createdAt: z.coerce.string(),
 });
@@ -133,6 +134,8 @@ export interface AgentConfigInput {
   creditCeiling?: number | null;
   /** A flow. Null keeps the version a single prompt. */
   graph?: unknown;
+  /** Pause and ask a person before any tool that changes something runs. */
+  approveWrites?: boolean;
 }
 
 export async function getAgents(workspaceId: string, limit = 50) {
@@ -267,6 +270,7 @@ function configPayload(config: AgentConfigInput) {
     maxRounds: config.maxRounds ?? 1,
     creditCeiling: config.creditCeiling ?? null,
     graph: config.graph ?? null,
+    approveWrites: config.approveWrites ?? true,
   };
 }
 
@@ -275,6 +279,10 @@ export const agentToolSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string(),
+  /** True when the tool changes something outside Ragenta. */
+  writes: z.boolean().default(false),
+  /** An integration id an administrator must have configured, or null. */
+  requires: z.string().nullable().default(null),
 });
 
 export type AgentToolInfo = z.infer<typeof agentToolSchema>;

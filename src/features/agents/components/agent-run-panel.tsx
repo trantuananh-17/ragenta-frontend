@@ -149,40 +149,71 @@ export function AgentRunPanel({
           )}
 
           {awaiting && streaming.runId && (
-            <form
-              className="space-y-2 rounded-md border border-dashed p-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void resume(streaming.runId!, answers);
-                setAnswers({});
-              }}
-            >
-              <p className="text-sm">{awaiting.prompt}</p>
-              {awaiting.fields.map((field) => (
-                <div key={field} className="space-y-1">
-                  <Label htmlFor={`answer-${field}`} className="text-xs">
-                    {field}
-                  </Label>
-                  <Input
-                    id={`answer-${field}`}
-                    value={answers[field] ?? ""}
-                    onChange={(event) =>
-                      setAnswers((current) => ({
-                        ...current,
-                        [field]: event.target.value,
-                      }))
-                    }
-                  />
+            /**
+             * Two shapes of pause, one mechanism. A flow's `user_input` node asks
+             * for values and gets text boxes; an approval asks a yes-or-no
+             * question about something that has not happened yet and gets two
+             * buttons — typing "yes" into a box to authorise an email would be
+             * the wrong affordance for the decision being made.
+             */
+            awaiting.fields.length === 1 && awaiting.fields[0] === "approve" ? (
+              <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+                <p className="text-sm font-medium">Approval needed</p>
+                <pre className="max-h-40 overflow-auto rounded bg-background p-2 text-xs whitespace-pre-wrap">
+                  {awaiting.prompt}
+                </pre>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => void resume(streaming.runId!, { approve: "yes" })}
+                  >
+                    Approve and continue
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void resume(streaming.runId!, { approve: "no" })}
+                  >
+                    Decline
+                  </Button>
                 </div>
-              ))}
-              <Button
-                type="submit"
-                size="sm"
-                disabled={awaiting.fields.some((field) => !answers[field]?.trim())}
+              </div>
+            ) : (
+              <form
+                className="space-y-2 rounded-md border border-dashed p-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void resume(streaming.runId!, answers);
+                  setAnswers({});
+                }}
               >
-                Continue
-              </Button>
-            </form>
+                <p className="text-sm">{awaiting.prompt}</p>
+                {awaiting.fields.map((field) => (
+                  <div key={field} className="space-y-1">
+                    <Label htmlFor={`answer-${field}`} className="text-xs">
+                      {field}
+                    </Label>
+                    <Input
+                      id={`answer-${field}`}
+                      value={answers[field] ?? ""}
+                      onChange={(event) =>
+                        setAnswers((current) => ({
+                          ...current,
+                          [field]: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={awaiting.fields.some((field) => !answers[field]?.trim())}
+                >
+                  Continue
+                </Button>
+              </form>
+            )
           )}
         </div>
       )}
