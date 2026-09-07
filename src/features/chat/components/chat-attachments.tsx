@@ -168,7 +168,7 @@ export function ComposerAttachments({
               <span className="text-[10px] text-muted-foreground">
                 {item.status === "failed"
                   ? (item.error ?? "This recording could not be uploaded.")
-                  : "Voice note — only the text is sent"}
+                  : "Voice note — sent with its transcript"}
               </span>
             </div>
           ) : (

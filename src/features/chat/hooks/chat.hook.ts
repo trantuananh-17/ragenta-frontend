@@ -330,6 +330,12 @@ export interface ComposerAttachment {
   fileName: string;
   /** What the strip shows: a thumbnail, or a player for a recording. */
   kind: "image" | "audio";
+  /**
+   * Set once a recording has actually been transcribed. A clip is "ready" as
+   * soon as it has uploaded, which is earlier — and a send refuses a recording
+   * with no transcript, so uploading is not on its own enough to send one.
+   */
+  transcribed?: boolean;
   /** An object URL over the chosen file, so the preview is there at once. */
   previewUrl: string;
   status: "uploading" | "ready" | "failed";
@@ -474,6 +480,21 @@ export function useComposerAttachments(workspaceId: string) {
     [items.length, upload],
   );
 
+  /**
+   * A recording became sendable, because its transcript came back.
+   *
+   * Keyed on the attachment id rather than the local one: transcription is
+   * driven by the voice hook, which is handed the uploaded attachment and never
+   * sees the composer's own bookkeeping id.
+   */
+  const markTranscribed = useCallback((attachmentId: string) => {
+    setItems((current) =>
+      current.map((item) =>
+        item.attachment?.id === attachmentId ? { ...item, transcribed: true } : item,
+      ),
+    );
+  }, []);
+
   const remove = useCallback(
     (localId: string) => {
       const item = items.find((candidate) => candidate.localId === localId);
@@ -497,38 +518,39 @@ export function useComposerAttachments(workspaceId: string) {
   );
 
   /**
-   * Empty the strip after a send. Deliberately not a delete for an image: it now
-   * belongs to the message that was just sent.
-   *
-   * A recording is the exception. A turn carries images only — the send refuses
-   * any other kind — so the clip went up to be transcribed and nothing will ever
-   * refer to it again; leaving it would be storage nobody can reach.
+   * Empty the strip after a send. Deliberately not a delete: an image and a
+   * recording both now belong to the message that was just sent, and a voice
+   * note is worth keeping beside its transcript — a transcript is a lossy record
+   * of what someone actually said, and the audio is the only way to check it.
    */
   const clear = useCallback(() => {
     for (const item of items) {
       URL.revokeObjectURL(item.previewUrl);
-      if (item.kind === "audio" && item.attachment) {
-        void deleteAttachment(workspaceId, item.attachment.id).catch(() => {});
-      }
     }
     setItems([]);
-  }, [items, workspaceId]);
+  }, [items]);
 
   return {
     items,
     add,
     addRecording,
+    markTranscribed,
     remove,
     clear,
     /**
-     * The ones a send can actually name. A failed upload is simply not among
-     * them, and neither is a recording: the backend accepts images on a message
-     * and refuses every other kind, so a clip would fail the whole turn. What a
-     * recording contributes is its transcript, which is by then ordinary text in
-     * the question.
+     * The ones a send can actually name — images and transcribed recordings
+     * alike. A failed upload is simply not among them.
+     *
+     * A recording reaches the model as its transcript, never as bytes, so the
+     * send refuses one that has not been transcribed yet — and a clip counts as
+     * ready the moment it uploads, which is earlier than that. `transcribed` is
+     * the gate, so a transcription that failed leaves the clip in the strip and
+     * out of the question rather than failing the whole turn.
      */
     ready: items.flatMap((item) =>
-      item.kind === "image" && item.status === "ready" && item.attachment
+      item.status === "ready" &&
+      item.attachment &&
+      (item.kind === "image" || item.transcribed === true)
         ? [item.attachment]
         : [],
     ),

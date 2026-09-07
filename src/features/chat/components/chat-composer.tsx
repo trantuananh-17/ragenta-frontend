@@ -100,6 +100,7 @@ export function ChatComposer({
     workspaceId,
     attach: attachments.addRecording,
     onTranscript: acceptTranscript,
+    onTranscribed: attachments.markTranscribed,
   });
 
   // Null is "not knowable yet", and the button stays available there: the

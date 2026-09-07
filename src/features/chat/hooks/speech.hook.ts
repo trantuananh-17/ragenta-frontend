@@ -168,11 +168,18 @@ export function useVoiceInput({
   workspaceId,
   attach,
   onTranscript,
+  onTranscribed,
 }: {
   workspaceId: string;
   /** Uploads the clip and resolves with it, or null when the upload failed. */
   attach: (file: File) => Promise<MessageAttachment | null>;
   onTranscript: (text: string) => void;
+  /**
+   * The clip now has a transcript, so it may be sent with the question. Only
+   * then: a recording the server could not transcribe would be refused on the
+   * send and take the whole turn with it.
+   */
+  onTranscribed?: (attachmentId: string) => void;
 }) {
   const [status, setStatus] = useState<VoiceInputStatus>("idle");
   const [seconds, setSeconds] = useState(0);
@@ -231,6 +238,7 @@ export function useVoiceInput({
       try {
         const transcript = await transcribeAttachment(workspaceId, attachment.id);
         const text = transcript.text.trim();
+        onTranscribed?.(attachment.id);
         if (text) {
           onTranscript(text);
         } else {
@@ -255,7 +263,7 @@ export function useVoiceInput({
         setSeconds(0);
       }
     },
-    [attach, onTranscript, workspaceId],
+    [attach, onTranscript, onTranscribed, workspaceId],
   );
 
   const stop = useCallback(() => {
