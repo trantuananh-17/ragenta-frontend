@@ -13,7 +13,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { AgentGraph, FlowNode } from "./graph-model";
+import {
+  casesOf,
+  categoriesOf,
+  type AgentGraph,
+  type CaseParam,
+  type CategoryParam,
+  type FlowNode,
+} from "./graph-model";
 
 /**
  * The settings of the selected node.
@@ -215,8 +222,7 @@ export function NodeParams({
   }
 
   if (node.type === "categorize") {
-    const categories =
-      (params.categories as { name: string; description: string; to: string }[]) ?? [];
+    const categories: CategoryParam[] = categoriesOf(node);
     return (
       <div className="space-y-3">
         <Field label="What to classify">
@@ -294,13 +300,7 @@ export function NodeParams({
     );
   }
 
-  const cases =
-    (params.cases as {
-      left: string;
-      operator: string;
-      right: string;
-      to: string;
-    }[]) ?? [];
+  const cases: CaseParam[] = casesOf(node);
 
   return (
     <Field label="Conditions" hint="Checked in order. The first match wins.">

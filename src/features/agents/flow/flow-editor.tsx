@@ -9,31 +9,48 @@ import {
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
+  useReactFlow,
   type Connection,
   type EdgeChange,
   type NodeChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Plus, Trash2 } from "lucide-react";
+import { GripVertical, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { ErrorPolicyFields } from "./error-policy";
 import { FlowNodeBox } from "./flow-node";
 import { NodeParams } from "./node-params";
+import { ValidationPanel } from "./validation-panel";
+import { hasBlockingProblem, validateFlow } from "./graph-validation";
 import {
   NODE_CATALOGUE,
   NODE_TYPES,
-  defaultParams,
+  OTHERWISE_HANDLE,
+  addNodeToGraph,
   fromCanvas,
-  newNodeId,
+  removeNodeFromGraph,
   toCanvas,
   type AgentGraph,
   type FlowNodeType,
 } from "./graph-model";
 
 const nodeTypes = { agentNode: FlowNodeBox };
+
+/** Private to this editor: what a palette button hands the canvas on drop. */
+const NODE_DRAG_TYPE = "application/x-ragenta-flow-node";
+
+interface FlowEditorProps {
+  graph: AgentGraph;
+  toolIds: string[];
+  disabled?: boolean;
+  pending?: boolean;
+  onChange: (graph: AgentGraph) => void;
+  onPublish: () => void;
+}
 
 /**
  * The flow canvas.
@@ -43,23 +60,29 @@ const nodeTypes = { agentNode: FlowNodeBox };
  * time, so what is on screen and what would be published cannot drift apart
  * while someone is looking at both.
  */
-export function FlowEditor({
+export function FlowEditor(props: FlowEditorProps) {
+  // The provider wraps the palette too, because dropping a step at the cursor
+  // needs `screenToFlowPosition`, which only exists inside it.
+  return (
+    <ReactFlowProvider>
+      <FlowEditorBody {...props} />
+    </ReactFlowProvider>
+  );
+}
+
+function FlowEditorBody({
   graph,
   toolIds,
   disabled,
   pending,
   onChange,
   onPublish,
-}: {
-  graph: AgentGraph;
-  toolIds: string[];
-  disabled?: boolean;
-  pending?: boolean;
-  onChange: (graph: AgentGraph) => void;
-  onPublish: () => void;
-}) {
+}: FlowEditorProps) {
   const [selected, setSelected] = useState<string | null>(null);
+  const { screenToFlowPosition } = useReactFlow();
   const canvas = useMemo(() => toCanvas(graph), [graph]);
+  const problems = useMemo(() => validateFlow(graph), [graph]);
+  const blocked = hasBlockingProblem(problems);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -79,77 +102,78 @@ export function FlowEditor({
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      const next = addEdge(connection, canvas.edges);
-      onChange(fromCanvas(graph, canvas.nodes, next));
+      // A branch routes to exactly one step, so connecting it again moves it
+      // rather than adding a second route. `otherwise` is the exception: it is
+      // a list of steps.
+      const replaces =
+        connection.sourceHandle !== null &&
+        connection.sourceHandle !== undefined &&
+        connection.sourceHandle !== OTHERWISE_HANDLE;
+      const base = replaces
+        ? canvas.edges.filter(
+            (edge) =>
+              edge.source !== connection.source ||
+              edge.sourceHandle !== connection.sourceHandle,
+          )
+        : canvas.edges;
+      onChange(fromCanvas(graph, canvas.nodes, addEdge(connection, base)));
     },
     [canvas.edges, canvas.nodes, graph, onChange],
   );
 
-  const addNode = (type: FlowNodeType) => {
-    const id = newNodeId(graph, type);
-    const count = Object.keys(graph.nodes).length;
-    onChange({
-      nodes: {
-        ...graph.nodes,
-        [id]: {
-          type,
-          label: NODE_CATALOGUE[type].title,
-          params: defaultParams(type),
-          upstream: [],
-          downstream: [],
-          position: { x: 320 + (count % 3) * 220, y: 80 + count * 40 },
-          onError: null,
-        },
-      },
-    });
-    setSelected(id);
+  const addNode = (type: FlowNodeType, position: { x: number; y: number } | null) => {
+    const added = addNodeToGraph(graph, type, position);
+    onChange(added.graph);
+    setSelected(added.id);
   };
 
   const removeNode = (id: string) => {
-    // Every reference to it goes too. A flow whose edges point at a node that is
-    // no longer there is one the backend refuses to publish, and finding that out
-    // at the publish button is worse than not creating it.
-    const nodes = Object.fromEntries(
-      Object.entries(graph.nodes)
-        .filter(([candidate]) => candidate !== id)
-        .map(([candidate, node]) => [
-          candidate,
-          {
-            ...node,
-            upstream: node.upstream.filter((entry) => entry !== id),
-            downstream: node.downstream.filter((entry) => entry !== id),
-          },
-        ]),
-    );
-    onChange({ nodes });
+    onChange(removeNodeFromGraph(graph, id));
     setSelected(null);
   };
 
   const node = selected ? graph.nodes[selected] : undefined;
+  const otherNodes = Object.keys(graph.nodes).filter((id) => id !== selected);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-      <div className="h-[560px] overflow-hidden rounded-lg border">
-        <ReactFlowProvider>
-          <ReactFlow
-            nodes={canvas.nodes}
-            edges={canvas.edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={disabled ? undefined : onNodesChange}
-            onEdgesChange={disabled ? undefined : onEdgesChange}
-            onConnect={disabled ? undefined : onConnect}
-            onNodeClick={(_event, clicked) => setSelected(clicked.id)}
-            onPaneClick={() => setSelected(null)}
-            fitView
-            proOptions={{ hideAttribution: false }}
-          >
-            <Background />
-            <Controls showInteractive={false} />
-          </ReactFlow>
-        </ReactFlowProvider>
+    <div className="grid gap-4 lg:h-[calc(100vh-19rem)] lg:min-h-[560px] lg:grid-cols-[1fr_320px]">
+      <div
+        className="h-[560px] overflow-hidden rounded-lg border lg:h-auto lg:min-h-0"
+        onDragOver={(event) => {
+          if (disabled) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }}
+        onDrop={(event) => {
+          if (disabled) return;
+          const dropped = event.dataTransfer.getData(NODE_DRAG_TYPE);
+          const type = NODE_TYPES.find((candidate) => candidate === dropped);
+          if (!type) return;
+          event.preventDefault();
+          addNode(
+            type,
+            screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+          );
+        }}
+      >
+        <ReactFlow
+          nodes={canvas.nodes}
+          edges={canvas.edges}
+          nodeTypes={nodeTypes}
+          onNodesChange={disabled ? undefined : onNodesChange}
+          onEdgesChange={disabled ? undefined : onEdgesChange}
+          onConnect={disabled ? undefined : onConnect}
+          onNodeClick={(_event, clicked) => setSelected(clicked.id)}
+          onPaneClick={() => setSelected(null)}
+          fitView
+          proOptions={{ hideAttribution: false }}
+        >
+          <Background />
+          <Controls showInteractive={false} />
+        </ReactFlow>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto">
         <div className="space-y-2 rounded-lg border p-3">
           <Label className="text-xs">Add a step</Label>
           <div className="grid grid-cols-2 gap-1.5">
@@ -160,16 +184,27 @@ export function FlowEditor({
                 variant="outline"
                 size="sm"
                 disabled={disabled}
+                draggable={!disabled}
                 className="justify-start"
                 title={NODE_CATALOGUE[type].description}
-                onClick={() => addNode(type)}
+                onDragStart={(event) => {
+                  event.dataTransfer.setData(NODE_DRAG_TYPE, type);
+                  event.dataTransfer.effectAllowed = "move";
+                }}
+                onClick={() => addNode(type, null)}
               >
-                <Plus className="size-3.5" />
+                <GripVertical className="size-3.5 text-muted-foreground" />
                 {NODE_CATALOGUE[type].title}
               </Button>
             ))}
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            Drag one onto the canvas to place it, or click to drop it beside the
+            last step.
+          </p>
         </div>
+
+        <ValidationPanel problems={problems} onSelect={setSelected} />
 
         <div className="space-y-3 rounded-lg border p-3">
           {!node || !selected ? (
@@ -227,6 +262,22 @@ export function FlowEditor({
                   })
                 }
               />
+
+              {node.type !== "begin" && (
+                <>
+                  <Separator />
+                  <ErrorPolicyFields
+                    policy={node.onError}
+                    targets={otherNodes}
+                    disabled={disabled}
+                    onChange={(onError) =>
+                      onChange({
+                        nodes: { ...graph.nodes, [selected]: { ...node, onError } },
+                      })
+                    }
+                  />
+                </>
+              )}
             </>
           )}
         </div>
@@ -234,7 +285,7 @@ export function FlowEditor({
         <Button
           type="button"
           className="w-full"
-          disabled={disabled || pending}
+          disabled={disabled || pending || blocked}
           onClick={onPublish}
         >
           {pending ? "Publishing…" : "Publish new version"}
