@@ -13,6 +13,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { AttachmentField } from "./attachment-field";
+
+/**
+ * Only .xlsx, which is the only thing the upload accepts and the only thing the
+ * spreadsheet steps can open. A wider filter here would let somebody pick a
+ * .csv and be refused by the server for a reason the picker implied was fine.
+ */
+const XLSX_ACCEPT =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx";
 import {
   casesOf,
   categoriesOf,
@@ -34,6 +43,7 @@ import {
  * impossible before publishing.
  */
 export function NodeParams({
+  workspaceId,
   graph,
   nodeId,
   node,
@@ -41,6 +51,7 @@ export function NodeParams({
   disabled,
   onChange,
 }: {
+  workspaceId: string;
   graph: AgentGraph;
   nodeId: string;
   node: FlowNode;
@@ -362,7 +373,12 @@ export function NodeParams({
               onChange(
                 value === "read"
                   ? { operation: "read", attachmentId: "" }
-                  : { operation: "write", sheets: [{ name: "Sheet1", rows: [[""]] }] },
+                  : {
+                      operation: "write",
+                      sheetName: "Sheet1",
+                      rowsFormat: "json",
+                      rows: "",
+                    },
               )
             }
           >
@@ -377,11 +393,16 @@ export function NodeParams({
         </Field>
         {operation === "read" ? (
           <>
-            <Field label="Attachment">
-              <Input
+            <Field
+              label="Workbook to read"
+              hint="Choose a file to store one with the flow, or point at the run's own with {{sys.attachment}}."
+            >
+              <AttachmentField
+                workspaceId={workspaceId}
                 value={text("attachmentId")}
+                accept={XLSX_ACCEPT}
                 disabled={disabled}
-                onChange={(event) => set("attachmentId", event.target.value)}
+                onChange={(value) => set("attachmentId", value)}
               />
             </Field>
             <Field label="Sheet (optional)" hint="Blank reads every sheet.">
@@ -393,10 +414,56 @@ export function NodeParams({
             </Field>
           </>
         ) : (
-          <p className="text-xs text-muted-foreground">
-            The rows a write step produces are normally built by an earlier model or
-            agent step. Point that step at this one and reference its output.
-          </p>
+          <>
+            <Field
+              label="Fill in this workbook (optional)"
+              hint="Rows land below what the sheet already holds. The file itself is never changed — the step saves a filled-in copy."
+            >
+              <AttachmentField
+                workspaceId={workspaceId}
+                value={text("templateAttachmentId")}
+                accept={XLSX_ACCEPT}
+                disabled={disabled}
+                onChange={(value) =>
+                  set("templateAttachmentId", value.trim() || undefined)
+                }
+              />
+            </Field>
+            <Field label="Sheet">
+              <Input
+                value={text("sheetName", "Sheet1")}
+                disabled={disabled}
+                onChange={(event) => set("sheetName", event.target.value)}
+              />
+            </Field>
+            <Field label="Rows come from">
+              <Select
+                value={text("rowsFormat", "json")}
+                disabled={disabled}
+                onValueChange={(value) => set("rowsFormat", value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="json">A JSON list of rows</SelectItem>
+                  <SelectItem value="lines">One row per line</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field
+              label="Rows"
+              hint="An earlier step's output. A JSON list of rows becomes as many rows as it holds, so one step can fill in a table it did not know the size of."
+            >
+              <Textarea
+                rows={3}
+                value={text("rows")}
+                disabled={disabled}
+                placeholder="{{extract.text}}"
+                onChange={(event) => set("rows", event.target.value)}
+              />
+            </Field>
+          </>
         )}
       </div>
     );

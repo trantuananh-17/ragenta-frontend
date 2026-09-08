@@ -340,9 +340,17 @@ function paramProblems(id: string, name: string, node: FlowNode): GraphProblem[]
 
     case "excel": {
       if (node.params.operation === "write") {
+        /*
+          Either source will do, and neither is the case worth catching: a write
+          with nothing to write publishes happily and produces a workbook holding
+          one empty cell, which reads as the step having run.
+        */
+        const rows = String(node.params.rows ?? "").trim();
         const sheets = (node.params.sheets as unknown[] | undefined) ?? [];
-        if (sheets.length === 0) {
-          problems.push(error(id, `"${name}" writes a workbook with no sheets.`));
+        if (rows.length === 0 && sheets.length === 0) {
+          problems.push(
+            error(id, `"${name}" has no rows to write. Point it at an earlier step's output.`),
+          );
         }
       } else {
         required("attachmentId", "workbook to read");

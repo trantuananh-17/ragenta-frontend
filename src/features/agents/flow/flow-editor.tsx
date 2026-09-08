@@ -45,6 +45,8 @@ const nodeTypes = { agentNode: FlowNodeBox };
 const NODE_DRAG_TYPE = "application/x-ragenta-flow-node";
 
 interface FlowEditorProps {
+  /** Needed by the node panel: a file chosen there is uploaded to this workspace. */
+  workspaceId: string;
   graph: AgentGraph;
   toolIds: string[];
   disabled?: boolean;
@@ -72,6 +74,7 @@ export function FlowEditor(props: FlowEditorProps) {
 }
 
 function FlowEditorBody({
+  workspaceId,
   graph,
   toolIds,
   disabled,
@@ -295,6 +298,7 @@ function FlowEditorBody({
               <Separator />
 
               <NodeParams
+                workspaceId={workspaceId}
                 graph={graph}
                 nodeId={selected}
                 node={node}

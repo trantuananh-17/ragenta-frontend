@@ -158,6 +158,7 @@ export function AgentDetail({ agentId }: { agentId: string }) {
           >
             {draft ? (
               <FlowEditor
+                workspaceId={workspace.id}
                 graph={draft}
                 toolIds={(tools ?? []).map((tool) => tool.id)}
                 disabled={!mayEdit}
