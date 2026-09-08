@@ -33,6 +33,7 @@ import { configFrom } from "../service/agents.service";
 import { AgentConfigForm } from "./agent-config-form";
 import { AgentRunPanel } from "./agent-run-panel";
 import { AgentTriggers } from "./agent-triggers";
+import { AgentVersions } from "./agent-versions";
 import { AgentStatusBadge } from "./agents-list";
 import { RunStatusBadge } from "./run-detail";
 
@@ -98,6 +99,7 @@ export function AgentDetail({ agentId }: { agentId: string }) {
             {isFlow && <span className="ml-1.5 text-muted-foreground">on</span>}
           </TabsTrigger>
           <TabsTrigger value="triggers">Triggers</TabsTrigger>
+          <TabsTrigger value="versions">Versions</TabsTrigger>
           <TabsTrigger value="history">
             History
             {runs.total > 0 && (
@@ -186,6 +188,15 @@ export function AgentDetail({ agentId }: { agentId: string }) {
             workspaceId={workspace.id}
             agentId={agentId}
             disabled={!mayEdit}
+          />
+        </TabsContent>
+
+        <TabsContent value="versions" className="mt-4">
+          <AgentVersions
+            workspaceId={workspace.id}
+            agentId={agentId}
+            currentVersion={agent.currentVersion}
+            disabled={!can("agent.publish")}
           />
         </TabsContent>
 

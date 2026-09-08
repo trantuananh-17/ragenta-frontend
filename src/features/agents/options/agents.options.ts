@@ -10,6 +10,7 @@ import {
   getAgentVersions,
   getAgents,
   getTriggers,
+  getVersionDiff,
 } from "../service/agents.service";
 
 export const agentKeys = {
@@ -31,6 +32,8 @@ export const agentKeys = {
     [...agentKeys.all(), "templates", workspaceId] as const,
   triggers: (workspaceId: string, agentId: string) =>
     [...agentKeys.all(), "triggers", workspaceId, agentId] as const,
+  diff: (workspaceId: string, agentId: string, from: number, to: number) =>
+    [...agentKeys.all(), "diff", workspaceId, agentId, from, to] as const,
 };
 
 export const agentOptions = {
@@ -83,5 +86,13 @@ export const agentOptions = {
     queryOptions({
       queryKey: agentKeys.triggers(workspaceId, agentId),
       queryFn: () => getTriggers(workspaceId, agentId),
+    }),
+  // Two immutable versions, so the answer cannot change. Kept rather than
+  // refetched every time somebody flips back to a pair they already looked at.
+  diff: (workspaceId: string, agentId: string, from: number, to: number) =>
+    queryOptions({
+      queryKey: agentKeys.diff(workspaceId, agentId, from, to),
+      queryFn: () => getVersionDiff(workspaceId, agentId, from, to),
+      staleTime: Infinity,
     }),
 };

@@ -735,3 +735,68 @@ export function webhookUrl(triggerId: string): string {
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   return `${origin}/api/v1/hooks/${triggerId}`;
 }
+
+/**
+ * One field that differs between two versions.
+ *
+ * `kind` decides how the screen renders it: a brief is long enough to want its
+ * own block, a tool list reads as added and removed items, and everything else
+ * is a before and an after on one line.
+ */
+export const fieldChangeSchema = z.object({
+  field: z.string(),
+  label: z.string(),
+  kind: z.enum(["text", "value", "list"]),
+  before: z.unknown(),
+  after: z.unknown(),
+});
+
+export type FieldChange = z.infer<typeof fieldChangeSchema>;
+
+export const versionDiffSchema = z.object({
+  from: z.object({ version: z.number(), createdAt: z.coerce.string() }),
+  to: z.object({ version: z.number(), createdAt: z.coerce.string() }),
+  changes: z.array(fieldChangeSchema),
+});
+
+export type VersionDiff = z.infer<typeof versionDiffSchema>;
+
+export async function getVersionDiff(
+  workspaceId: string,
+  agentId: string,
+  from: number,
+  to: number,
+): Promise<VersionDiff> {
+  const response = await api.get(
+    `workspaces/${workspaceId}/agents/${agentId}/versions/diff`,
+    { searchParams: { from, to } },
+  );
+  return versionDiffSchema.parse(await response.json());
+}
+
+/**
+ * Goes back to an earlier version by publishing it again.
+ *
+ * The response names the new version rather than the restored one, because that
+ * is what runs from now on — and saying so is what stops somebody expecting the
+ * number to go backwards.
+ */
+export async function restoreVersion(
+  workspaceId: string,
+  agentId: string,
+  version: number,
+): Promise<{ publishedAs: number; restoredFrom: number }> {
+  const response = await api.post(
+    `workspaces/${workspaceId}/agents/${agentId}/versions/${version}/restore`,
+  );
+  const body = z
+    .object({
+      version: agentVersionSchema.nullish(),
+      restoredFrom: z.number(),
+    })
+    .parse(await response.json());
+  return {
+    publishedAs: body.version?.version ?? 0,
+    restoredFrom: body.restoredFrom,
+  };
+}
