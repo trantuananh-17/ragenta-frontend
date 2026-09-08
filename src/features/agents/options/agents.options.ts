@@ -10,6 +10,7 @@ import {
   getAgentVersions,
   getAgents,
   getTriggers,
+  getComparison,
   getVersionDiff,
 } from "../service/agents.service";
 
@@ -34,6 +35,8 @@ export const agentKeys = {
     [...agentKeys.all(), "triggers", workspaceId, agentId] as const,
   diff: (workspaceId: string, agentId: string, from: number, to: number) =>
     [...agentKeys.all(), "diff", workspaceId, agentId, from, to] as const,
+  comparison: (workspaceId: string, comparisonId: string) =>
+    [...agentKeys.all(), "comparison", workspaceId, comparisonId] as const,
 };
 
 export const agentOptions = {
@@ -94,5 +97,10 @@ export const agentOptions = {
       queryKey: agentKeys.diff(workspaceId, agentId, from, to),
       queryFn: () => getVersionDiff(workspaceId, agentId, from, to),
       staleTime: Infinity,
+    }),
+  comparison: (workspaceId: string, comparisonId: string) =>
+    queryOptions({
+      queryKey: agentKeys.comparison(workspaceId, comparisonId),
+      queryFn: () => getComparison(workspaceId, comparisonId),
     }),
 };
