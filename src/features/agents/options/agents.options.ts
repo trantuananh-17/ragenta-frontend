@@ -5,9 +5,11 @@ import {
   getAgentRun,
   getAgentRunSteps,
   getAgentRuns,
+  getAgentTemplates,
   getAgentTools,
   getAgentVersions,
   getAgents,
+  getTriggers,
 } from "../service/agents.service";
 
 export const agentKeys = {
@@ -25,6 +27,10 @@ export const agentKeys = {
     [...agentKeys.all(), "steps", workspaceId, runId] as const,
   tools: (workspaceId: string) =>
     [...agentKeys.all(), "tools", workspaceId] as const,
+  templates: (workspaceId: string) =>
+    [...agentKeys.all(), "templates", workspaceId] as const,
+  triggers: (workspaceId: string, agentId: string) =>
+    [...agentKeys.all(), "triggers", workspaceId, agentId] as const,
 };
 
 export const agentOptions = {
@@ -65,5 +71,17 @@ export const agentOptions = {
       queryKey: agentKeys.tools(workspaceId),
       queryFn: () => getAgentTools(workspaceId),
       staleTime: Infinity,
+    }),
+  // Compiled into the backend, but each one's tools are marked available against
+  // this workspace's connections — so it is per workspace and not cached forever.
+  templates: (workspaceId: string) =>
+    queryOptions({
+      queryKey: agentKeys.templates(workspaceId),
+      queryFn: () => getAgentTemplates(workspaceId),
+    }),
+  triggers: (workspaceId: string, agentId: string) =>
+    queryOptions({
+      queryKey: agentKeys.triggers(workspaceId, agentId),
+      queryFn: () => getTriggers(workspaceId, agentId),
     }),
 };

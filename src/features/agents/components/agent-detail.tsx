@@ -29,8 +29,10 @@ import {
 } from "../hooks/agents.hook";
 import { FlowEditor } from "../flow/flow-editor";
 import { emptyGraph, type AgentGraph } from "../flow/graph-model";
+import { configFrom } from "../service/agents.service";
 import { AgentConfigForm } from "./agent-config-form";
 import { AgentRunPanel } from "./agent-run-panel";
+import { AgentTriggers } from "./agent-triggers";
 import { AgentStatusBadge } from "./agents-list";
 import { RunStatusBadge } from "./run-detail";
 
@@ -95,6 +97,7 @@ export function AgentDetail({ agentId }: { agentId: string }) {
             Flow
             {isFlow && <span className="ml-1.5 text-muted-foreground">on</span>}
           </TabsTrigger>
+          <TabsTrigger value="triggers">Triggers</TabsTrigger>
           <TabsTrigger value="history">
             History
             {runs.total > 0 && (
@@ -165,26 +168,7 @@ export function AgentDetail({ agentId }: { agentId: string }) {
                 onChange={setDraft}
                 onPublish={() =>
                   agent.config &&
-                  publish.mutate({
-                    instructions: agent.config.instructions,
-                    model:
-                      agent.config.provider && agent.config.model
-                        ? {
-                            provider: agent.config.provider,
-                            model: agent.config.model,
-                          }
-                        : null,
-                    temperature: agent.config.temperature,
-                    maxOutputTokens: agent.config.maxOutputTokens,
-                    knowledgeBaseIds: agent.config.knowledgeBaseIds,
-                    searchMode: agent.config.searchMode as "hybrid",
-                    topK: agent.config.topK,
-                    groundedOnly: agent.config.groundedOnly,
-                    tools: agent.config.tools,
-                    maxRounds: agent.config.maxRounds,
-                    creditCeiling: agent.config.creditCeiling,
-                    graph: draft,
-                  })
+                  publish.mutate({ ...configFrom(agent.config), graph: draft })
                 }
               />
             ) : (
@@ -195,6 +179,14 @@ export function AgentDetail({ agentId }: { agentId: string }) {
               </p>
             )}
           </DetailSection>
+        </TabsContent>
+
+        <TabsContent value="triggers" className="mt-4">
+          <AgentTriggers
+            workspaceId={workspace.id}
+            agentId={agentId}
+            disabled={!mayEdit}
+          />
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">

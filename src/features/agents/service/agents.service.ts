@@ -12,6 +12,9 @@ export type AgentStatus = (typeof AGENT_STATUSES)[number];
 export const SEARCH_MODES = ["hybrid", "vector", "keyword"] as const;
 export type SearchMode = (typeof SEARCH_MODES)[number];
 
+export const MEMORY_SCOPES = ["agent", "user"] as const;
+export type MemoryScope = (typeof MEMORY_SCOPES)[number];
+
 /**
  * One immutable version of an agent's configuration. Editing publishes a new
  * one; a run records the version it ran, so what an answer was produced by stays
@@ -42,6 +45,9 @@ export const agentVersionSchema = z.object({
   /** A flow, when this version is one. Null means a single prompt. */
   graph: z.unknown().nullable().default(null),
   approveWrites: z.boolean().default(true),
+  memoryEnabled: z.boolean().default(false),
+  memoryScope: z.enum(["agent", "user"]).default("agent"),
+  memoryTopK: z.number().default(5),
   createdBy: z.string().nullable(),
   createdAt: z.coerce.string(),
 });
@@ -136,6 +142,51 @@ export interface AgentConfigInput {
   graph?: unknown;
   /** Pause and ask a person before any tool that changes something runs. */
   approveWrites?: boolean;
+  /** Whether this version remembers anything between runs. Off by default. */
+  memoryEnabled?: boolean;
+  /** `agent` shares what it learned; `user` keeps each person's to themselves. */
+  memoryScope?: MemoryScope;
+  /** How many memories one run may recall. */
+  memoryTopK?: number;
+}
+
+/**
+ * The current version, as the input that would republish it unchanged.
+ *
+ * For anything that changes one setting and publishes — the flow canvas, say.
+ * Assembling that payload field by field at each call site is how a setting
+ * nobody was thinking about gets quietly reset to its default on the next
+ * publish, which is the same shape of bug as promoting somebody dropping their
+ * other roles.
+ */
+export function configFrom(version: AgentVersion): AgentConfigInput {
+  return {
+    instructions: version.instructions,
+    model:
+      version.provider && version.model
+        ? { provider: version.provider, model: version.model }
+        : null,
+    temperature: version.temperature,
+    maxOutputTokens: version.maxOutputTokens,
+    knowledgeBaseIds: version.knowledgeBaseIds,
+    searchMode: version.searchMode as SearchMode,
+    topK: version.topK,
+    similarityThreshold: version.similarityThreshold,
+    vectorWeight: version.vectorWeight,
+    rerank:
+      version.rerankProvider && version.rerankModel
+        ? { provider: version.rerankProvider, model: version.rerankModel }
+        : null,
+    groundedOnly: version.groundedOnly,
+    tools: version.tools,
+    maxRounds: version.maxRounds,
+    creditCeiling: version.creditCeiling,
+    graph: version.graph,
+    approveWrites: version.approveWrites,
+    memoryEnabled: version.memoryEnabled,
+    memoryScope: version.memoryScope,
+    memoryTopK: version.memoryTopK,
+  };
 }
 
 export async function getAgents(workspaceId: string, limit = 50) {
@@ -271,6 +322,9 @@ function configPayload(config: AgentConfigInput) {
     creditCeiling: config.creditCeiling ?? null,
     graph: config.graph ?? null,
     approveWrites: config.approveWrites ?? true,
+    memoryEnabled: config.memoryEnabled ?? false,
+    memoryScope: config.memoryScope ?? "agent",
+    memoryTopK: config.memoryTopK ?? 5,
   };
 }
 
@@ -504,4 +558,180 @@ async function* readEvents(
     const parsed = streamEventSchema.safeParse(payload);
     if (parsed.success) yield parsed.data;
   }
+}
+
+/**
+ * An agent somebody can start from instead of from an empty box.
+ *
+ * Each tool arrives marked `available` or not, because a template asks for tools
+ * this deployment may not be able to run: applying it drops those rather than
+ * refusing, and the screen says so before the choice rather than after it
+ * (ADR-057).
+ */
+export const agentTemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  summary: z.string(),
+  description: z.string(),
+  instructions: z.string(),
+  tools: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      available: z.boolean(),
+      requires: z.string().nullable(),
+    }),
+  ),
+  needsKnowledgeBase: z.boolean(),
+  memory: z.object({
+    enabled: z.boolean(),
+    scope: z.enum(MEMORY_SCOPES),
+  }),
+  maxRounds: z.number(),
+  groundedOnly: z.boolean(),
+});
+
+export type AgentTemplate = z.infer<typeof agentTemplateSchema>;
+
+export async function getAgentTemplates(
+  workspaceId: string,
+): Promise<AgentTemplate[]> {
+  const response = await api.get(`workspaces/${workspaceId}/agent-templates`);
+  const body = z
+    .object({ templates: z.array(agentTemplateSchema) })
+    .parse(await response.json());
+  return body.templates;
+}
+
+export interface CreateFromTemplateInput {
+  templateId: string;
+  name?: string;
+  projectId?: string | null;
+  knowledgeBaseIds?: string[];
+}
+
+const createdFromTemplateSchema = z.object({
+  agent: agentSchema,
+  /** Tools the template asked for that this deployment cannot run. */
+  droppedTools: z.array(z.string()),
+  template: z.string(),
+});
+
+export type CreatedFromTemplate = z.infer<typeof createdFromTemplateSchema>;
+
+export async function createAgentFromTemplate(
+  workspaceId: string,
+  input: CreateFromTemplateInput,
+): Promise<CreatedFromTemplate> {
+  const response = await api.post(`workspaces/${workspaceId}/agents/from-template`, {
+    json: {
+      templateId: input.templateId,
+      name: input.name,
+      projectId: input.projectId ?? null,
+      knowledgeBaseIds: input.knowledgeBaseIds ?? [],
+    },
+  });
+  return createdFromTemplateSchema.parse(await response.json());
+}
+
+export const TRIGGER_KINDS = ["webhook", "schedule"] as const;
+export type TriggerKind = (typeof TRIGGER_KINDS)[number];
+
+/**
+ * What starts a run when nobody is watching.
+ *
+ * A webhook's secret is never in this shape — it is hashed on the server and
+ * returned once, by the call that created it. `secretHint` is the few characters
+ * that let somebody tell two webhooks apart, and nothing more.
+ */
+export const triggerSchema = z.object({
+  id: z.string(),
+  agentId: z.string(),
+  kind: z.enum(TRIGGER_KINDS),
+  name: z.string(),
+  enabled: z.boolean(),
+  input: z.string(),
+  cron: z.string().nullable(),
+  timezone: z.string(),
+  secretHint: z.string().nullable(),
+  nextRunAt: z.coerce.string().nullable(),
+  lastFiredAt: z.coerce.string().nullable(),
+  failureCount: z.number(),
+  lastError: z.string().nullable(),
+  createdAt: z.coerce.string(),
+});
+
+export type Trigger = z.infer<typeof triggerSchema>;
+
+export interface SaveTriggerInput {
+  kind: TriggerKind;
+  name: string;
+  enabled: boolean;
+  input: string;
+  cron?: string;
+  timezone: string;
+}
+
+export async function getTriggers(
+  workspaceId: string,
+  agentId: string,
+): Promise<Trigger[]> {
+  const response = await api.get(
+    `workspaces/${workspaceId}/agents/${agentId}/triggers`,
+  );
+  const body = z
+    .object({ triggers: z.array(triggerSchema) })
+    .parse(await response.json());
+  return body.triggers;
+}
+
+const createdTriggerSchema = z.object({
+  trigger: triggerSchema.optional(),
+  /** A webhook's secret, shown once and never again. */
+  secret: z.string().optional(),
+});
+
+export type CreatedTrigger = z.infer<typeof createdTriggerSchema>;
+
+export async function createTrigger(
+  workspaceId: string,
+  agentId: string,
+  input: SaveTriggerInput,
+): Promise<CreatedTrigger> {
+  const response = await api.post(
+    `workspaces/${workspaceId}/agents/${agentId}/triggers`,
+    { json: input },
+  );
+  return createdTriggerSchema.parse(await response.json());
+}
+
+export async function updateTrigger(
+  workspaceId: string,
+  triggerId: string,
+  input: SaveTriggerInput,
+): Promise<Trigger> {
+  const response = await api.put(`workspaces/${workspaceId}/triggers/${triggerId}`, {
+    json: input,
+  });
+  const body = z.object({ trigger: triggerSchema }).parse(await response.json());
+  return body.trigger;
+}
+
+export async function deleteTrigger(
+  workspaceId: string,
+  triggerId: string,
+): Promise<void> {
+  await api.delete(`workspaces/${workspaceId}/triggers/${triggerId}`);
+}
+
+/**
+ * The URL a third party POSTs to fire a webhook.
+ *
+ * Built from the browser's own origin rather than from a configured base, the
+ * same way the widget snippet is: the caller reaches this app, and this app
+ * forwards to the backend — so the URL somebody copies is the one that works.
+ */
+export function webhookUrl(triggerId: string): string {
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  return `${origin}/api/v1/hooks/${triggerId}`;
 }

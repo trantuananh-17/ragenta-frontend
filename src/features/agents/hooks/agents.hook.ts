@@ -15,16 +15,22 @@ import type { Citation } from "@/features/chat/service/chat.service";
 import { agentKeys, agentOptions } from "../options/agents.options";
 import {
   createAgent,
+  createAgentFromTemplate,
+  createTrigger,
   deleteAgent,
+  deleteTrigger,
   publishAgentVersion,
   resumeAgentRun,
   stopAgentRun,
   streamAgentRun,
   updateAgent,
+  updateTrigger,
   type AgentConfigInput,
   type AgentStreamEvent,
   type CreateAgentInput,
+  type CreateFromTemplateInput,
   type RunAgentInput,
+  type SaveTriggerInput,
   type UpdateAgentInput,
 } from "../service/agents.service";
 
@@ -71,6 +77,108 @@ export function useCreateAgent(workspaceId: string) {
     },
     onError: async (error) => {
       toast.error("The agent could not be created", {
+        description: await errorMessage(error),
+      });
+    },
+  });
+}
+
+/** Agents somebody can start from, with each template's tools marked usable here. */
+export function useAgentTemplates(workspaceId: string) {
+  return useQuery(agentOptions.templates(workspaceId));
+}
+
+/**
+ * Create an agent from a template.
+ *
+ * Tools the deployment cannot run are dropped by the server rather than
+ * refused, so the toast says which — an agent quietly missing the tool its brief
+ * talks about is the confusing version of this.
+ */
+export function useCreateFromTemplate(workspaceId: string) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: CreateFromTemplateInput) =>
+      createAgentFromTemplate(workspaceId, input),
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: agentKeys.list(workspaceId) });
+      if (result.droppedTools.length > 0) {
+        toast.warning("Created without some of its tools", {
+          description: `${result.droppedTools.join(", ")} — this deployment has no connection for them. Everything else came across.`,
+        });
+      }
+      router.push(`/agents/${result.agent.id}`);
+    },
+    onError: async (error) => {
+      toast.error("The agent could not be created", {
+        description: await errorMessage(error),
+      });
+    },
+  });
+}
+
+export function useTriggers(workspaceId: string, agentId: string) {
+  return useQuery(agentOptions.triggers(workspaceId, agentId));
+}
+
+/**
+ * Add a trigger, returning a webhook's secret to whoever asked for it.
+ *
+ * The secret is in the mutation's result and nowhere else — it is stored hashed,
+ * so this response is the only time it exists. The caller shows it and says so.
+ */
+export function useCreateTrigger(workspaceId: string, agentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: SaveTriggerInput) => createTrigger(workspaceId, agentId, input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.triggers(workspaceId, agentId),
+      });
+    },
+    onError: async (error) => {
+      toast.error("The trigger could not be added", {
+        description: await errorMessage(error),
+      });
+    },
+  });
+}
+
+export function useUpdateTrigger(workspaceId: string, agentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (variables: { triggerId: string; input: SaveTriggerInput }) =>
+      updateTrigger(workspaceId, variables.triggerId, variables.input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.triggers(workspaceId, agentId),
+      });
+    },
+    onError: async (error) => {
+      toast.error("The trigger could not be changed", {
+        description: await errorMessage(error),
+      });
+    },
+  });
+}
+
+export function useDeleteTrigger(workspaceId: string, agentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (triggerId: string) => deleteTrigger(workspaceId, triggerId),
+    onSuccess: async () => {
+      toast.success("Trigger removed.");
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.triggers(workspaceId, agentId),
+      });
+    },
+    onError: async (error) => {
+      toast.error("The trigger could not be removed", {
         description: await errorMessage(error),
       });
     },
