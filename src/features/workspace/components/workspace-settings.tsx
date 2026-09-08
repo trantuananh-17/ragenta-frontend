@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCredits, formatDate, formatNumber } from "@/lib/format";
-import { canAdminister } from "@/lib/workspace";
 import {
   useUpdateWorkspace,
   useWorkspaceOverviewSuspense,
@@ -17,12 +16,12 @@ import {
 import { useWorkspace } from "./workspace-provider";
 
 export function WorkspaceSettings() {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const overview = useWorkspaceOverviewSuspense(workspace.id);
   const update = useUpdateWorkspace(workspace.id);
   const [name, setName] = useState(overview.data.workspace.name);
 
-  const mayEdit = canAdminister(overview.data.role);
+  const mayEdit = can("workspace.update");
 
   return (
     <div className="space-y-6">
@@ -96,8 +95,7 @@ export function WorkspaceSettings() {
 
       {!mayEdit && (
         <p className="text-sm text-muted-foreground">
-          Your role in this workspace is {overview.data.role}, which can read
-          these settings but not change them.
+          You can read these settings but not change them.
         </p>
       )}
     </div>

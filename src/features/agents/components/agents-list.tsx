@@ -12,7 +12,6 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
-import { canContribute } from "@/lib/workspace";
 import { useAgentsSuspense } from "../hooks/agents.hook";
 import { CreateAgentDialog } from "./create-agent-dialog";
 
@@ -28,10 +27,10 @@ export function AgentStatusBadge({ status }: { status: string }) {
 }
 
 export function AgentsScreen() {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const { data } = useAgentsSuspense(workspace.id);
   const [creating, setCreating] = useState(false);
-  const mayCreate = canContribute(workspace.role);
+  const mayCreate = can("agent.create");
 
   return (
     <>

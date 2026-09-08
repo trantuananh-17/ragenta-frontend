@@ -30,7 +30,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
-import { canAdminister } from "@/lib/workspace";
 import {
   useCancelInvitation,
   useInvitationsSuspense,
@@ -44,6 +43,7 @@ import {
   ASSIGNABLE_ROLES,
   type AssignableRole,
 } from "../service/workspace.service";
+import { MemberRolesCell } from "./member-roles-cell";
 import { useWorkspace } from "./workspace-provider";
 
 const inviteSchema = z.object({
@@ -60,7 +60,7 @@ const ROLE_HINT: Record<string, string> = {
 };
 
 export function MembersScreen() {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const overview = useWorkspaceOverviewSuspense(workspace.id);
   const members = useMembersSuspense(workspace.id);
   const invitations = useInvitationsSuspense(workspace.id);
@@ -71,7 +71,7 @@ export function MembersScreen() {
   const cancelInvitation = useCancelInvitation(workspace.id);
 
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
-  const mayAdminister = canAdminister(overview.data.role);
+  const mayAdminister = can("member.update");
   const seats = overview.data.billing.seats;
   const seatsFull = seats.limit !== null && seats.used >= seats.limit;
 
@@ -171,6 +171,7 @@ export function MembersScreen() {
             <TableRow>
               <TableHead>Person</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Extra roles</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -222,6 +223,14 @@ export function MembersScreen() {
                       </SelectContent>
                     </Select>
                   )}
+                </TableCell>
+                <TableCell>
+                  <MemberRolesCell
+                    workspaceId={workspace.id}
+                    memberId={member.id}
+                    builtInRole={member.role}
+                    disabled={!mayAdminister}
+                  />
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
                   {formatDate(member.createdAt)}

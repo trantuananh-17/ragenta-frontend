@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/table";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
 import { formatCredits, formatDate, formatDateTime, formatUsd } from "@/lib/format";
-import { canAdminister } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
 import {
   useBillingPortal,
@@ -56,7 +55,7 @@ function planCredits(plan: PlanOption): string {
 }
 
 export function BillingScreen() {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const summary = useBillingSummarySuspense(workspace.id);
   const catalogue = usePlanCatalogueSuspense();
   const redemptions = usePromoRedemptionsSuspense(workspace.id);
@@ -68,7 +67,7 @@ export function BillingScreen() {
   const checkoutResult = searchParams.get("checkout");
   const [code, setCode] = useState("");
 
-  const mayPay = canAdminister(workspace.role);
+  const mayPay = can("billing.manage");
   const current = summary.data.plan;
 
   return (

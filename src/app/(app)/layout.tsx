@@ -4,7 +4,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { WorkspaceProvider } from "@/features/workspace/components/workspace-provider";
 import { requireAuth } from "@/lib/auth";
-import { listWorkspaces, requireWorkspace } from "@/lib/workspace";
+import { listPermissions, listWorkspaces, requireWorkspace } from "@/lib/workspace";
 
 /**
  * The signed-in shell.
@@ -24,9 +24,15 @@ export default async function AppLayout({
     requireWorkspace(),
     listWorkspaces(),
   ]);
+  // After the workspace, not beside it: the request needs its id.
+  const permissions = await listPermissions(workspace.id);
 
   return (
-    <WorkspaceProvider workspace={workspace} workspaces={workspaces}>
+    <WorkspaceProvider
+      workspace={workspace}
+      workspaces={workspaces}
+      permissions={permissions}
+    >
       <SidebarProvider>
         <AppSidebar user={session.user} />
         <SidebarInset className="flex h-svh flex-col overflow-hidden bg-accent/20">

@@ -181,3 +181,64 @@ export async function removeMember(
 ): Promise<void> {
   await api.delete(`workspaces/${workspaceId}/members/${memberId}`);
 }
+
+/**
+ * The roles this workspace can assign — the four built in, plus any it wrote
+ * itself (ADR-052).
+ *
+ * `scope` and `key` are plain strings, never a `z.enum`. That is the whole point
+ * of custom roles: the client cannot know their names, and a strict enum here
+ * would reject the payload that carries them.
+ */
+export const workspaceRoleSchema = z.object({
+  id: z.string(),
+  organizationId: z.string().nullable(),
+  scope: z.string(),
+  key: z.string(),
+  name: z.string(),
+  description: z.string(),
+  isSystem: z.boolean(),
+  permissions: z.array(z.string()),
+});
+
+export type WorkspaceRole = z.infer<typeof workspaceRoleSchema>;
+
+export async function getWorkspaceRoles(
+  workspaceId: string,
+): Promise<WorkspaceRole[]> {
+  const response = await api.get(`workspaces/${workspaceId}/roles`);
+  const body = await response.json();
+  return z
+    .object({ roles: z.array(workspaceRoleSchema) })
+    .parse(body).roles;
+}
+
+const memberRoleSchema = workspaceRoleSchema.omit({ permissions: true });
+
+export async function getMemberRoles(
+  workspaceId: string,
+  memberId: string,
+): Promise<z.infer<typeof memberRoleSchema>[]> {
+  const response = await api.get(
+    `workspaces/${workspaceId}/members/${memberId}/roles`,
+  );
+  const body = await response.json();
+  return z.object({ roles: z.array(memberRoleSchema) }).parse(body).roles;
+}
+
+/**
+ * Replaces a member's roles.
+ *
+ * The set must carry the member's current built-in role — the backend refuses
+ * otherwise, because that one is Better Auth's to write and is changed through
+ * the role picker beside this (ADR-053).
+ */
+export async function setMemberRoles(
+  workspaceId: string,
+  memberId: string,
+  roleIds: string[],
+): Promise<void> {
+  await api.put(`workspaces/${workspaceId}/members/${memberId}/roles`, {
+    json: { roleIds },
+  });
+}

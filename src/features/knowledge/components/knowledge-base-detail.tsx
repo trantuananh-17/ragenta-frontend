@@ -34,7 +34,6 @@ import {
 } from "@/components/ui/table";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
 import { formatBytes, formatDateTime, formatNumber } from "@/lib/format";
-import { canAdminister, canContribute } from "@/lib/workspace";
 import {
   useCancelDocument,
   useChunkingMethods,
@@ -51,7 +50,7 @@ import { DocumentUpload } from "./document-upload";
 import { KnowledgeBaseSettingsDialog } from "./knowledge-base-settings-dialog";
 
 export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const base = useKnowledgeBaseSuspense(workspace.id, baseId);
   const documents = useDocumentsSuspense(workspace.id, baseId);
   // The registry already carries a human name for every strategy; a second
@@ -71,8 +70,8 @@ export function KnowledgeBaseDetail({ baseId }: { baseId: string }) {
   const [deletingBase, setDeletingBase] = useState(false);
   const [editingSettings, setEditingSettings] = useState(false);
 
-  const mayContribute = canContribute(workspace.role);
-  const mayDeleteBase = canAdminister(workspace.role);
+  const mayContribute = can("document.create");
+  const mayDeleteBase = can("knowledgeBase.delete");
 
   return (
     <DetailShell>

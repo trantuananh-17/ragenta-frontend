@@ -19,7 +19,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
 import { formatCredits, formatDateTime } from "@/lib/format";
-import { canContribute } from "@/lib/workspace";
 import {
   useAgentRunsSuspense,
   useAgentSuspense,
@@ -36,7 +35,7 @@ import { AgentStatusBadge } from "./agents-list";
 import { RunStatusBadge } from "./run-detail";
 
 export function AgentDetail({ agentId }: { agentId: string }) {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const { data: agent } = useAgentSuspense(workspace.id, agentId);
   const { data: runs } = useAgentRunsSuspense(workspace.id, agentId);
   const update = useUpdateAgent(workspace.id, agentId);
@@ -50,7 +49,7 @@ export function AgentDetail({ agentId }: { agentId: string }) {
   // over many small changes and publishing a version per drag would be absurd.
   const [draft, setDraft] = useState<AgentGraph | null>(stored);
 
-  const mayEdit = canContribute(workspace.role);
+  const mayEdit = can("agent.update");
   const active = agent.status === "active";
   const isFlow = stored !== null;
 
