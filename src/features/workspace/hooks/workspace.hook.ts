@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import {
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
@@ -17,6 +18,7 @@ import {
   createWorkspace,
   inviteMember,
   removeMember,
+  setMemberRoles,
   updateMemberRole,
   updateWorkspace,
   type AssignableRole,
@@ -185,6 +187,42 @@ export function useRemoveMember(workspaceId: string) {
     },
     onError: async (error) => {
       toast.error("Could not remove", {
+        description: await errorMessage(error),
+      });
+    },
+  });
+}
+
+export function useWorkspaceRoles(workspaceId: string) {
+  return useQuery(workspaceOptions.roles(workspaceId));
+}
+
+export function useMemberRoles(workspaceId: string, memberId: string | null) {
+  return useQuery({
+    ...workspaceOptions.memberRoles(workspaceId, memberId ?? ""),
+    enabled: memberId !== null,
+  });
+}
+
+/**
+ * Replaces a member's roles.
+ *
+ * Invalidates the whole workspace key rather than just this member's: changing
+ * what somebody may do can change what the *caller* sees if they changed their
+ * own, and a stale permission set renders buttons that will now be refused.
+ */
+export function useSetMemberRoles(workspaceId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ memberId, roleIds }: { memberId: string; roleIds: string[] }) =>
+      setMemberRoles(workspaceId, memberId, roleIds),
+    onSuccess: () => {
+      toast.success("Roles updated.");
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.all() });
+    },
+    onError: async (error) => {
+      toast.error("Could not change roles", {
         description: await errorMessage(error),
       });
     },
