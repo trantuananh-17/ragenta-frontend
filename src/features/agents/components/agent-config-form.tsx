@@ -29,6 +29,7 @@ import { useAgentTools } from "../hooks/agents.hook";
 import type {
   AgentConfigInput,
   AgentVersion,
+  MemoryScope,
   SearchMode,
 } from "../service/agents.service";
 
@@ -48,6 +49,9 @@ const schema = z.object({
   approveWrites: z.boolean(),
   maxRounds: z.string(),
   creditCeiling: z.string(),
+  memoryEnabled: z.boolean(),
+  memoryScope: z.enum(["agent", "user"]),
+  memoryTopK: z.string(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -91,6 +95,9 @@ function defaultsFrom(version: AgentVersion | null | undefined): FormValues {
       version?.creditCeiling === null || version?.creditCeiling === undefined
         ? ""
         : String(version.creditCeiling),
+    memoryEnabled: version?.memoryEnabled ?? false,
+    memoryScope: (version?.memoryScope as MemoryScope) ?? "agent",
+    memoryTopK: String(version?.memoryTopK ?? 5),
   };
 }
 
@@ -142,6 +149,8 @@ export function AgentConfigForm({
   const groundedOnly = useWatch({ control, name: "groundedOnly" });
   const selectedTools = useWatch({ control, name: "tools" });
   const approveWrites = useWatch({ control, name: "approveWrites" });
+  const memoryEnabled = useWatch({ control, name: "memoryEnabled" });
+  const memoryScope = useWatch({ control, name: "memoryScope" });
   const picksWritingTool = (tools ?? []).some(
     (tool) => tool.writes && selectedTools.includes(tool.id),
   );
@@ -164,6 +173,9 @@ export function AgentConfigForm({
       approveWrites: values.approveWrites,
       maxRounds: Number(values.maxRounds) || 1,
       creditCeiling: optionalNumber(values.creditCeiling),
+      memoryEnabled: values.memoryEnabled,
+      memoryScope: values.memoryScope,
+      memoryTopK: Number(values.memoryTopK) || 5,
     });
   });
 
@@ -390,6 +402,67 @@ export function AgentConfigForm({
           </div>
         </div>
       )}
+
+      <div className="space-y-3 rounded-lg border p-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="memoryEnabled">Remember between runs</Label>
+            <p className="text-xs text-muted-foreground">
+              It notes what it is told that will matter next time, and recalls it
+              before answering. Off means every run starts from nothing, which is
+              how every agent behaved before this setting existed.
+            </p>
+          </div>
+          <Switch
+            id="memoryEnabled"
+            disabled={disabled}
+            checked={memoryEnabled}
+            onCheckedChange={(checked) => form.setValue("memoryEnabled", checked)}
+          />
+        </div>
+
+        {memoryEnabled && (
+          <div className="grid gap-4 border-t pt-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Whose memories</Label>
+              <Select
+                value={memoryScope}
+                disabled={disabled}
+                onValueChange={(next) =>
+                  form.setValue("memoryScope", next as MemoryScope)
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="agent">Shared by everyone</SelectItem>
+                  <SelectItem value="user">Private to each person</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Shared suits facts about the work. Private suits anything a person
+                told it about themselves — one person&apos;s memories are never read
+                for another.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="memoryTopK">Memories recalled per run</Label>
+              <Input
+                id="memoryTopK"
+                inputMode="numeric"
+                disabled={disabled}
+                {...form.register("memoryTopK")}
+              />
+              <p className="text-xs text-muted-foreground">
+                Bounded because recall competes with the documents for room in the
+                prompt. Between 1 and 20.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
