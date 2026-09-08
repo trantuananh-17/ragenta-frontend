@@ -15,6 +15,7 @@ import {
   useVersionDiff,
 } from "../hooks/agents.hook";
 import type { FieldChange } from "../service/agents.service";
+import { VersionComparison } from "./version-comparison";
 
 /**
  * The agent's history, and a way back into it.
@@ -30,12 +31,20 @@ export function AgentVersions({
   workspaceId,
   agentId,
   currentVersion,
-  disabled,
+  canPublish,
+  canRun,
 }: {
   workspaceId: string;
   agentId: string;
   currentVersion: number;
-  disabled?: boolean;
+  /** Going back publishes, so it is gated on publishing. */
+  canPublish: boolean;
+  /**
+   * Comparing spends credits, so it is gated on running — a separate
+   * permission, and roles are composable now, so a role with one and not the
+   * other is a shape somebody can actually build.
+   */
+  canRun: boolean;
 }) {
   const { data: versions, isPending } = useAgentVersions(workspaceId, agentId);
   const restore = useRestoreVersion(workspaceId, agentId);
@@ -105,7 +114,7 @@ export function AgentVersions({
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={disabled || isCurrent || restore.isPending}
+                      disabled={!canPublish || isCurrent || restore.isPending}
                       onClick={() => setRestoring(version.version)}
                     >
                       <RotateCcw className="size-4" />
@@ -147,6 +156,14 @@ export function AgentVersions({
           )}
         </DetailSection>
       )}
+
+      <VersionComparison
+        workspaceId={workspaceId}
+        agentId={agentId}
+        versions={ordered}
+        currentVersion={currentVersion}
+        disabled={!canRun}
+      />
 
       <ConfirmDialog
         open={restoring !== null}

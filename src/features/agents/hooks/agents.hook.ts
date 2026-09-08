@@ -15,6 +15,7 @@ import type { Citation } from "@/features/chat/service/chat.service";
 import { agentKeys, agentOptions } from "../options/agents.options";
 import {
   createAgent,
+  compareVersions,
   createAgentFromTemplate,
   createTrigger,
   deleteAgent,
@@ -29,6 +30,7 @@ import {
   type AgentConfigInput,
   type AgentStreamEvent,
   type CreateAgentInput,
+  type CompareVersionsInput,
   type CreateFromTemplateInput,
   type RunAgentInput,
   type SaveTriggerInput,
@@ -285,6 +287,48 @@ export function useRestoreVersion(workspaceId: string, agentId: string) {
       toast.error("That version could not be restored", {
         description: await errorMessage(error),
       });
+    },
+  });
+}
+
+/**
+ * Starts a comparison. The answer is run ids, not answers.
+ *
+ * Each version is an ordinary queued run, so what comes back is something to
+ * watch rather than something to read — which is why this returns the id and
+ * `useComparison` does the following.
+ */
+export function useCompareVersions(workspaceId: string, agentId: string) {
+  return useMutation({
+    mutationFn: (input: CompareVersionsInput) =>
+      compareVersions(workspaceId, agentId, input),
+    onError: async (error) => {
+      toast.error("The comparison could not be started", {
+        description: await errorMessage(error),
+      });
+    },
+  });
+}
+
+/**
+ * Watches a comparison until every run has stopped.
+ *
+ * Polled rather than streamed: several runs at once would need a multiplexed
+ * event shape, and all this screen needs to know is when each one finished.
+ * The interval stops on its own once nothing is still going, so an open tab
+ * does not poll a finished comparison forever.
+ */
+export function useComparison(workspaceId: string, comparisonId: string | null) {
+  return useQuery({
+    ...agentOptions.comparison(workspaceId, comparisonId ?? ""),
+    enabled: comparisonId !== null,
+    refetchInterval: (query) => {
+      const runs = query.state.data?.runs ?? [];
+      if (runs.length === 0) return 2_000;
+      const running = runs.some(
+        (run) => run.status === "pending" || run.status === "running",
+      );
+      return running ? 2_000 : false;
     },
   });
 }

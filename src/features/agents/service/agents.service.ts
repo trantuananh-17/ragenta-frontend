@@ -800,3 +800,57 @@ export async function restoreVersion(
     restoredFrom: body.restoredFrom,
   };
 }
+
+/**
+ * One input, run against several versions.
+ *
+ * The answer is run ids rather than answers: each version is an ordinary queued
+ * run, so the comparison is watched by polling the runs rather than by holding
+ * several streams open at once.
+ */
+export interface CompareVersionsInput {
+  input: string;
+  versions: number[];
+}
+
+const comparisonStartedSchema = z.object({
+  comparisonId: z.string(),
+  runs: z.array(z.object({ runId: z.string(), version: z.number() })),
+});
+
+export type ComparisonStarted = z.infer<typeof comparisonStartedSchema>;
+
+export async function compareVersions(
+  workspaceId: string,
+  agentId: string,
+  input: CompareVersionsInput,
+): Promise<ComparisonStarted> {
+  const response = await api.post(
+    `workspaces/${workspaceId}/agents/${agentId}/compare`,
+    { json: input },
+  );
+  return comparisonStartedSchema.parse(await response.json());
+}
+
+/** A comparison's runs, each carrying the version number it ran. */
+export const comparisonRunSchema = agentRunSchema.extend({
+  /** Null only if the version row was somehow unreadable; every run has one. */
+  version: z.number().nullable(),
+});
+
+export type ComparisonRun = z.infer<typeof comparisonRunSchema>;
+
+const comparisonSchema = z.object({
+  comparisonId: z.string(),
+  runs: z.array(comparisonRunSchema),
+});
+
+export type Comparison = z.infer<typeof comparisonSchema>;
+
+export async function getComparison(
+  workspaceId: string,
+  comparisonId: string,
+): Promise<Comparison> {
+  const response = await api.get(`workspaces/${workspaceId}/comparisons/${comparisonId}`);
+  return comparisonSchema.parse(await response.json());
+}

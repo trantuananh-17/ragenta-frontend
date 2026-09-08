@@ -196,7 +196,8 @@ export function AgentDetail({ agentId }: { agentId: string }) {
             workspaceId={workspace.id}
             agentId={agentId}
             currentVersion={agent.currentVersion}
-            disabled={!can("agent.publish")}
+            canPublish={can("agent.publish")}
+            canRun={can("agent.run")}
           />
         </TabsContent>
 
