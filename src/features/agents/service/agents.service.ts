@@ -344,6 +344,13 @@ export interface RunAgentInput {
   input: string;
   /** Narrows retrieval to specific documents. Empty means every document. */
   documentIds?: string[];
+  /**
+   * Images this run is about, uploaded through the same endpoint chat uses.
+   *
+   * A single-prompt agent sends them to the model, so it needs one that can
+   * see; a flow reaches them through its own steps and does not.
+   */
+  attachmentIds?: string[];
 }
 
 export type AgentStreamEvent =

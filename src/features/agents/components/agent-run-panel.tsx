@@ -1,15 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Loader2, Play, Square, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { Check, ImagePlus, Loader2, Play, Square, X } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ComposerAttachments } from "@/features/chat/components/chat-attachments";
 import { AnswerBody } from "@/features/chat/components/chat-message";
 import { SourceList } from "@/features/chat/components/citations";
+import { useComposerAttachments } from "@/features/chat/hooks/chat.hook";
+import { ACCEPTED_ATTACHMENT_TYPES } from "@/features/chat/service/chat.service";
+import { cn } from "@/lib/utils";
 import { useRunAgent } from "../hooks/agents.hook";
 import type { Agent } from "../service/agents.service";
 
@@ -32,14 +36,32 @@ export function AgentRunPanel({
 }) {
   const [input, setInput] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [dragging, setDragging] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const { run, resume, stop, streaming, pending } = useRunAgent(workspaceId, agent.id);
+  /*
+    The same hook the chat composer uses, unchanged. It is keyed on the
+    workspace rather than on a conversation, which is what makes it fit here —
+    an attachment belongs to the workspace until something claims it, and a run
+    claims it exactly as a message does.
+  */
+  const attachments = useComposerAttachments(workspaceId);
   const inactive = agent.status !== "active";
   const awaiting = streaming?.awaiting ?? null;
+  const mayAttach = !disabled && !inactive && !pending && !attachments.full;
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!input.trim() || pending) return;
-    void run({ input: input.trim() });
+    const ready = attachments.ready.map((attachment) => attachment.id);
+    void run({
+      input: input.trim(),
+      ...(ready.length > 0 ? { attachmentIds: ready } : {}),
+    });
+    // Cleared on send, not on the run finishing: an attachment may only be
+    // claimed once, so leaving the strip up invites a second run that the
+    // server refuses for a reason nothing on screen explains.
+    attachments.clear();
   };
 
   return (
@@ -53,14 +75,75 @@ export function AgentRunPanel({
       )}
 
       <form onSubmit={submit} className="space-y-3">
-        <Textarea
-          rows={4}
-          value={input}
-          disabled={disabled || inactive}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="What should this agent work on?"
-        />
+        <div
+          onDragOver={(event) => {
+            // Swallowed whether or not the file can be attached: a drop the
+            // browser handles itself opens the image and takes the run panel
+            // off the screen.
+            event.preventDefault();
+            if (mayAttach) setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragging(false);
+            if (mayAttach) attachments.add(Array.from(event.dataTransfer.files));
+          }}
+          className={cn(
+            "rounded-lg border bg-background transition-colors",
+            "focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20",
+            dragging && "border-primary bg-accent/40",
+          )}
+        >
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            accept={ACCEPTED_ATTACHMENT_TYPES}
+            className="hidden"
+            onChange={(event) => {
+              attachments.add(Array.from(event.target.files ?? []));
+              // Cleared so choosing the same file twice fires a change both times.
+              event.target.value = "";
+            }}
+          />
+
+          <ComposerAttachments
+            items={attachments.items}
+            onRemove={attachments.remove}
+            disabled={disabled}
+          />
+
+          <Textarea
+            rows={4}
+            value={input}
+            disabled={disabled || inactive}
+            className="border-0 shadow-none focus-visible:ring-0"
+            onChange={(event) => setInput(event.target.value)}
+            onPaste={(event) => {
+              // Pasting a screenshot is how people actually attach one, and the
+              // clipboard carries it as a file alongside the text. Only taken
+              // when there is one, so pasting ordinary text still types.
+              const files = Array.from(event.clipboardData.files);
+              if (files.length === 0) return;
+              event.preventDefault();
+              if (mayAttach) attachments.add(files);
+            }}
+            placeholder="What should this agent work on?"
+          />
+        </div>
         <div className="flex items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="mr-auto"
+            disabled={!mayAttach}
+            onClick={() => fileRef.current?.click()}
+          >
+            <ImagePlus className="size-4" />
+            {attachments.full ? "No room for more" : "Add an image"}
+          </Button>
           {pending ? (
             <Button
               type="button"
