@@ -30,7 +30,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
-import { canAdminister } from "@/lib/workspace";
 import {
   useCancelInvitation,
   useInvitationsSuspense,
@@ -60,7 +59,7 @@ const ROLE_HINT: Record<string, string> = {
 };
 
 export function MembersScreen() {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const overview = useWorkspaceOverviewSuspense(workspace.id);
   const members = useMembersSuspense(workspace.id);
   const invitations = useInvitationsSuspense(workspace.id);
@@ -71,7 +70,7 @@ export function MembersScreen() {
   const cancelInvitation = useCancelInvitation(workspace.id);
 
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
-  const mayAdminister = canAdminister(overview.data.role);
+  const mayAdminister = can("member.update");
   const seats = overview.data.billing.seats;
   const seatsFull = seats.limit !== null && seats.used >= seats.limit;
 

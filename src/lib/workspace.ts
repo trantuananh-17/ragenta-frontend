@@ -78,12 +78,35 @@ export async function requireWorkspace(): Promise<WorkspaceSummary> {
   return workspace;
 }
 
-/** Roles that may spend the workspace's credits. `viewer` may only read. */
-export function canContribute(role: string): boolean {
-  return role === "owner" || role === "admin" || role === "member";
-}
+/**
+ * What the caller may actually do in this workspace, asked of the backend.
+ *
+ * This replaced `canContribute` / `canAdminister`, which decided from the role
+ * string. Those were a *guess* about what the backend would allow, kept in step
+ * by hand — and since roles became composable (ADR-046) the guess is simply
+ * wrong for any role somebody wrote themselves. The backend resolves the set and
+ * this reads it.
+ *
+ * Still affordance only. The backend decides; this decides what to render.
+ *
+ * An empty set on failure is the safe direction: buttons disappear rather than
+ * appearing and then failing.
+ */
+export const listPermissions = cache(
+  async (workspaceId: string): Promise<string[]> => {
+    const cookie = await forwardedCookie();
+    if (!cookie) return [];
 
-/** Roles that administer members, billing and workspace settings. */
-export function canAdminister(role: string): boolean {
-  return role === "owner" || role === "admin";
-}
+    try {
+      const response = await fetch(
+        `${RAGENTA_API_URL}/v1/workspaces/${workspaceId}/permissions`,
+        { headers: { cookie, accept: "application/json" }, cache: "no-store" },
+      );
+      if (!response.ok) return [];
+      const body = (await response.json()) as { permissions?: string[] };
+      return body.permissions ?? [];
+    } catch {
+      return [];
+    }
+  },
+);

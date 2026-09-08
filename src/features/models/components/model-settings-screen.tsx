@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/table";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
 import { formatNumber } from "@/lib/format";
-import { canAdminister } from "@/lib/workspace";
 import {
   useModelCatalogueSuspense,
   useModelSettingsSuspense,
@@ -65,12 +64,12 @@ function Availability({ model }: { model: CatalogueModel }) {
 }
 
 export function ModelSettingsScreen() {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const catalogue = useModelCatalogueSuspense(workspace.id);
   const settings = useModelSettingsSuspense(workspace.id);
   const update = useUpdateModelSettings(workspace.id);
 
-  const mayEdit = canAdminister(workspace.role);
+  const mayEdit = can("model.manage");
   const chatModels = catalogue.data.models.filter(
     (model) => model.capability === "chat",
   );
@@ -167,8 +166,9 @@ export function ModelSettingsScreen() {
 
         {!mayEdit && (
           <p className="mt-4 text-sm text-muted-foreground">
-            Your role is {workspace.role}; changing the workspace default is an
-            owner or admin decision because it has a price attached.
+            You can see which models this workspace may use but not choose them.
+            Changing the default has a price attached, so it is a separate
+            permission.
           </p>
         )}
       </DetailSection>

@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
 import type { ModelSelection } from "@/features/models/service/models.service";
-import { canContribute } from "@/lib/workspace";
 import {
   useConversationSuspense,
   useDeleteConversation,
@@ -52,7 +51,7 @@ function attachmentIds(attachments: MessageAttachment[]): string[] | undefined {
  * thing a streaming chat can do.
  */
 export function ConversationView({ conversationId }: { conversationId: string }) {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const conversation = useConversationSuspense(workspace.id, conversationId);
   const messages = useMessagesSuspense(workspace.id, conversationId);
   const updateConversation = useUpdateConversation(workspace.id, conversationId);
@@ -101,7 +100,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
     });
   }, [messages.data.items.length, streaming?.content]);
 
-  const mayChat = canContribute(workspace.role);
+  const mayChat = can("chat.send");
 
   /**
    * The streamed answer is dropped only once its saved row is on screen, and the
@@ -192,7 +191,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
             stopping={streaming?.stopping}
             onStop={stop}
             disabled={!mayChat}
-            disabledReason="Your role in this workspace can read but not spend its credits."
+            disabledReason="You can read this workspace but not spend its credits."
             model={model}
             onSubmit={({ content, attachments }) =>
               void send(

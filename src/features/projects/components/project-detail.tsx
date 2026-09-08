@@ -25,7 +25,6 @@ import {
   parseModelKey,
 } from "@/features/models/service/models.service";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
-import { canAdminister, canContribute } from "@/lib/workspace";
 import {
   useArchiveProject,
   useDeleteProject,
@@ -36,7 +35,7 @@ import {
 const WORKSPACE_DEFAULT = "__default__";
 
 export function ProjectDetail({ projectId }: { projectId: string }) {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const project = useProjectSuspense(workspace.id, projectId);
   const update = useUpdateProject(workspace.id, projectId);
   const archive = useArchiveProject(workspace.id);
@@ -47,8 +46,8 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const [description, setDescription] = useState(project.data.description ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const mayEdit = canContribute(workspace.role);
-  const mayArchive = canAdminister(workspace.role);
+  const mayEdit = can("project.update");
+  const mayArchive = can("project.archive");
   const mayDelete = workspace.role === "owner";
   const archived = Boolean(project.data.archivedAt);
 

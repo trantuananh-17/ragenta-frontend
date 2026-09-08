@@ -12,7 +12,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
 import { formatNumber } from "@/lib/format";
-import { canContribute } from "@/lib/workspace";
 import { useKnowledgeBasesSuspense } from "../hooks/knowledge.hook";
 import { CreateKnowledgeBaseDialog } from "./create-knowledge-base-dialog";
 
@@ -22,10 +21,10 @@ import { CreateKnowledgeBaseDialog } from "./create-knowledge-base-dialog";
  * better as a pair of figures than as two more columns.
  */
 export function KnowledgeBasesScreen() {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const { data } = useKnowledgeBasesSuspense(workspace.id);
   const [creating, setCreating] = useState(false);
-  const mayCreate = canContribute(workspace.role);
+  const mayCreate = can("knowledgeBase.create");
 
   return (
     <>

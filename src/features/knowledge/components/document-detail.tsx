@@ -12,7 +12,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
 import { formatBytes, formatDateTime, formatNumber } from "@/lib/format";
 import { totalPages } from "@/lib/pagination";
-import { canContribute } from "@/lib/workspace";
 import {
   useCancelDocument,
   useChunksSuspense,
@@ -40,7 +39,7 @@ export function DocumentDetail({
   baseId: string;
   documentId: string;
 }) {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const [page, setPage] = useState(1);
   const document = useDocumentSuspense(workspace.id, documentId);
   const chunks = useChunksSuspense(workspace.id, documentId, page);
@@ -57,7 +56,7 @@ export function DocumentDetail({
   // with no override of its own already does.
   const [parserId, setParserId] = useState(document.data.parserId ?? INHERIT);
 
-  const mayContribute = canContribute(workspace.role);
+  const mayContribute = can("document.update");
   const running = ACTIVE_DOCUMENT_STATUSES.includes(document.data.status);
 
   return (

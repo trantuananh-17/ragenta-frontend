@@ -7,7 +7,6 @@ import { BookOpen, Sparkles } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { knowledgeOptions } from "@/features/knowledge/options/knowledge.options";
-import { canContribute } from "@/lib/workspace";
 import {
   useWorkspace,
 } from "@/features/workspace/components/workspace-provider";
@@ -27,14 +26,14 @@ import { ProjectPicker } from "./retrieval-pickers";
  * is just a row in the sidebar.
  */
 export function NewChat() {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const create = useCreateConversation(workspace.id);
   const bases = useQuery(knowledgeOptions.bases(workspace.id));
   const [knowledgeBaseId, setKnowledgeBaseId] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [model, setModel] = useState<ModelSelection | null>(null);
 
-  const mayChat = canContribute(workspace.role);
+  const mayChat = can("conversation.create");
   const hasBases = (bases.data?.items.length ?? 0) > 0;
 
   return (
@@ -54,7 +53,7 @@ export function NewChat() {
         autoFocus
         pending={create.isPending}
         disabled={!mayChat}
-        disabledReason="Your role in this workspace can read but not spend its credits."
+        disabledReason="You can read this workspace but not start a conversation in it."
         model={model}
         onSubmit={({ content, attachments }) =>
           create.mutate(

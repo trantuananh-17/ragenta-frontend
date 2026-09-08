@@ -29,7 +29,6 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
 import { formatDate } from "@/lib/format";
-import { canContribute } from "@/lib/workspace";
 import { useCreateProject, useProjectsSuspense } from "../hooks/projects.hook";
 
 const schema = z.object({
@@ -110,12 +109,12 @@ function CreateProjectDialog({
 }
 
 export function ProjectsScreen() {
-  const { workspace } = useWorkspace();
+  const { workspace, can } = useWorkspace();
   const [includeArchived, setIncludeArchived] = useState(false);
   const [creating, setCreating] = useState(false);
   const { data } = useProjectsSuspense(workspace.id, includeArchived);
 
-  const mayCreate = canContribute(workspace.role);
+  const mayCreate = can("project.create");
 
   return (
     <>
