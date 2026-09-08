@@ -79,6 +79,30 @@ app.get("/api/health", (c) => c.json({ status: "ok" }));
  * the chat SSE endpoint work across it — the backend already sets
  * `X-Accel-Buffering: no` for the reverse proxy in front of this one.
  */
+/**
+ * The one path here that a *third party's* page calls.
+ *
+ * `widget.js` runs on a customer's own website, so its request to this app is
+ * cross-origin and the browser will not make it without these headers. They are
+ * deliberately permissive: **CORS is advice to a browser, and the decision is the
+ * widget's own origin allowlist**, which `ragenta-backend` checks against the
+ * `Origin` this proxy forwards untouched. Refusing here would only mean the
+ * backend never got to give its own answer (ADR-066).
+ */
+app.use("/api/v1/widget/*", async (c, next) => {
+  const origin = c.req.header("origin");
+  if (origin) {
+    c.header("Access-Control-Allow-Origin", origin);
+    c.header("Vary", "Origin");
+    c.header("Access-Control-Allow-Headers", "content-type, x-ragenta-visitor");
+    c.header("Access-Control-Expose-Headers", "x-ragenta-visitor");
+    c.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    c.header("Access-Control-Max-Age", "86400");
+  }
+  if (c.req.method === "OPTIONS") return c.body(null, 204);
+  await next();
+});
+
 app.all("/api/v1/*", (c) => {
   const url = new URL(c.req.url);
   const path = url.pathname.replace(/^\/api\/v1\/?/, "");
