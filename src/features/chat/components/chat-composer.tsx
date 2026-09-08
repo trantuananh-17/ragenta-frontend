@@ -197,6 +197,19 @@ export function ChatComposer({
         placeholder={disabled ? (disabledReason ?? placeholder) : placeholder}
         rows={1}
         onChange={(event) => setValue(event.target.value)}
+        onPaste={(event) => {
+          // Pasting a screenshot is how people actually attach one, and the
+          // clipboard carries it as a file alongside the text. Only taken when
+          // there is one, so pasting ordinary text still types.
+          const files = Array.from(event.clipboardData.files);
+          if (files.length === 0) return;
+          event.preventDefault();
+          if (mayAttach) {
+            attachments.add(files);
+          } else if (visionRefused) {
+            toast.error(attachLabel);
+          }
+        }}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();

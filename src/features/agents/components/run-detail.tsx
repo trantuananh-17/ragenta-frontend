@@ -4,23 +4,16 @@ import { DetailSection, DetailShell } from "@/components/detail-shell";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Download, FileSpreadsheet } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { AnswerBody } from "@/features/chat/components/chat-message";
 import { attachmentContentUrl } from "@/features/chat/service/chat.service";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
-import { formatCredits, formatDateTime, formatNumber } from "@/lib/format";
+import { formatCredits, formatDateTime } from "@/lib/format";
 import { useAgentRunSteps, useAgentRunSuspense } from "../hooks/agents.hook";
 import type { AgentRunStep } from "../service/agents.service";
+import { RunSteps } from "./run-steps";
 
 interface ProducedFile {
   seq: number;
@@ -65,6 +58,39 @@ function fileSize(bytes: number | null): string | null {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/**
+ * The run's own error, pointed at the step that owns it.
+ *
+ * On its own this line names no owner, and a flow with eight steps gives it
+ * eight possible authors — somebody spent an afternoon editing the wrong one.
+ * The reason itself belongs on the failed step, so this only says where to look.
+ */
+function RunFailure({
+  error,
+  failed,
+  className,
+}: {
+  error: string;
+  failed: AgentRunStep[];
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <p className="text-sm text-destructive break-words whitespace-pre-wrap">
+        {error}
+      </p>
+      {failed.length > 0 && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {failed.length === 1
+            ? `Step ${failed[0].seq} · ${failed[0].name ?? failed[0].kind} failed.`
+            : `Steps ${failed.map((step) => step.seq).join(", ")} failed.`}{" "}
+          Under Steps below, each says why and what it was given.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** succeeded is green; stopped is a choice, not a failure, so it is not red. */
 export function RunStatusBadge({ status }: { status: string }) {
   return (
@@ -89,6 +115,7 @@ export function RunDetail({ agentId, runId }: { agentId: string; runId: string }
   const { data: run } = useAgentRunSuspense(workspace.id, runId);
   const { data: steps } = useAgentRunSteps(workspace.id, runId);
   const files = producedFiles(steps);
+  const failed = (steps ?? []).filter((step) => step.status === "failed");
 
   const question = typeof run.input.input === "string" ? run.input.input : "";
 
@@ -119,12 +146,18 @@ export function RunDetail({ agentId, runId }: { agentId: string; runId: string }
         {run.output ? (
           <AnswerBody content={run.output} citations={[]} />
         ) : (
-          <p className="text-sm text-muted-foreground">
-            {run.error ?? "This run produced no output."}
-          </p>
+          !run.error && (
+            <p className="text-sm text-muted-foreground">
+              This run produced no output.
+            </p>
+          )
         )}
-        {run.output && run.error && (
-          <p className="mt-3 text-sm text-destructive">{run.error}</p>
+        {run.error && (
+          <RunFailure
+            error={run.error}
+            failed={failed}
+            className={run.output ? "mt-3" : undefined}
+          />
         )}
       </DetailSection>
 
@@ -170,57 +203,14 @@ export function RunDetail({ agentId, runId }: { agentId: string; runId: string }
 
       <DetailSection
         title="Steps"
-        description="What the run did, in order. Every row that made a provider call carries the usage reference it was billed under; a tool that only read or fetched cost nothing."
+        description="What the run did, in order. Open a row to read what that step was given and what it produced; a step that failed says why without being opened. A tool that only read or fetched cost nothing."
       >
         {!steps || steps.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             This run made no billable call.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>#</TableHead>
-                  <TableHead>Step</TableHead>
-                  <TableHead>Model</TableHead>
-                  <TableHead className="text-right">In</TableHead>
-                  <TableHead className="text-right">Out</TableHead>
-                  <TableHead className="text-right">Credits</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {steps.map((step) => (
-                  <TableRow key={step.id}>
-                    <TableCell className="tabular-nums">{step.seq}</TableCell>
-                    <TableCell>
-                      {step.name ?? step.kind}
-                      {step.name && (
-                        <span className="ml-1 text-xs text-muted-foreground">
-                          {step.kind}
-                        </span>
-                      )}
-                      {step.status === "failed" && (
-                        <span className="ml-1 text-xs text-destructive">failed</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {step.model ? `${step.provider} / ${step.model}` : "—"}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(step.inputTokens)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(step.outputTokens)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCredits(step.credits)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <RunSteps steps={steps} />
         )}
       </DetailSection>
     </DetailShell>
