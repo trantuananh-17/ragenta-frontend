@@ -19,6 +19,7 @@ import {
   createTrigger,
   deleteAgent,
   deleteTrigger,
+  restoreVersion,
   publishAgentVersion,
   resumeAgentRun,
   stopAgentRun,
@@ -230,6 +231,58 @@ export function usePublishVersion(workspaceId: string, agentId: string) {
     },
     onError: async (error) => {
       toast.error("The version could not be published", {
+        description: await errorMessage(error),
+      });
+    },
+  });
+}
+
+/**
+ * What changed between two versions.
+ *
+ * Enabled only once a pair is chosen: with nothing selected there is no
+ * question to ask, and firing a request for `undefined` would be a 422 the
+ * screen would then have to explain.
+ */
+export function useVersionDiff(
+  workspaceId: string,
+  agentId: string,
+  from: number | null,
+  to: number | null,
+) {
+  return useQuery({
+    ...agentOptions.diff(workspaceId, agentId, from ?? 0, to ?? 0),
+    enabled: from !== null && to !== null && from !== to,
+  });
+}
+
+/**
+ * Go back to an earlier version.
+ *
+ * The toast names the **new** version rather than the restored one, because
+ * that is what runs from now on — somebody expecting the number to go backwards
+ * should find out here rather than from the header.
+ */
+export function useRestoreVersion(workspaceId: string, agentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (version: number) => restoreVersion(workspaceId, agentId, version),
+    onSuccess: async (result) => {
+      toast.success(
+        `Version ${result.restoredFrom} is current again, published as version ${result.publishedAs}.`,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: agentKeys.detail(workspaceId, agentId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: agentKeys.versions(workspaceId, agentId),
+        }),
+      ]);
+    },
+    onError: async (error) => {
+      toast.error("That version could not be restored", {
         description: await errorMessage(error),
       });
     },
