@@ -12,6 +12,7 @@ const TABS = [
   { href: "/settings/connections", label: "Connections" },
   { href: "/settings/data", label: "Databases" },
   { href: "/settings/embed", label: "Embedded chat" },
+  { href: "/settings/webhooks", label: "Webhooks" },
   { href: "/settings/billing", label: "Billing" },
 ];
 
