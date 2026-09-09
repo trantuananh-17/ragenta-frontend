@@ -96,7 +96,7 @@ export function NodeParams({
         </Field>
         <Field
           label="Prompt"
-          hint="Reference another node with {{nodeId.text}}."
+          hint="Reference an earlier step with {{id.text}} — the ids are listed above."
         >
           <Textarea
             rows={5}

@@ -42,6 +42,46 @@ import {
 
 const nodeTypes = { agentNode: FlowNodeBox };
 
+/**
+ * The ids a prompt can reference, and this node's own.
+ *
+ * A template is written as `{{some_node.text}}`, and until now the id was in the
+ * graph and nowhere on screen — the canvas shows a label, the panel showed the
+ * fields, and the one string the syntax needs was unobtainable without reading
+ * the JSON. The hint told people to reference a node by an id they had no way of
+ * knowing.
+ */
+function NodeReferences({ graph, selected }: { graph: AgentGraph; selected: string }) {
+  const others = Object.entries(graph.nodes).filter(([id]) => id !== selected);
+
+  return (
+    <div className="space-y-1.5 rounded-md bg-muted/40 p-2">
+      <p className="text-[11px] text-muted-foreground">
+        This step&apos;s id — what other steps write to reach its output
+      </p>
+      <code className="block font-mono text-xs">{selected}</code>
+
+      {others.length > 0 && (
+        <>
+          <p className="pt-1 text-[11px] text-muted-foreground">
+            Paste one of these into a prompt to use an earlier step&apos;s output
+          </p>
+          <ul className="space-y-0.5">
+            {others.map(([id, other]) => (
+              <li key={id} className="flex items-baseline gap-1.5 text-[11px]">
+                <code className="font-mono">{`{{${id}.text}}`}</code>
+                <span className="truncate text-muted-foreground">
+                  {other.label || other.type}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
 /** Private to this editor: what a palette button hands the canvas on drop. */
 const NODE_DRAG_TYPE = "application/x-ragenta-flow-node";
 
@@ -297,6 +337,8 @@ function FlowEditorBody({
                   })
                 }
               />
+
+              <NodeReferences graph={graph} selected={selected} />
 
               <Separator />
 
