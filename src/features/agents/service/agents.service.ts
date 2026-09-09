@@ -854,3 +854,35 @@ export async function getComparison(
   const response = await api.get(`workspaces/${workspaceId}/comparisons/${comparisonId}`);
   return comparisonSchema.parse(await response.json());
 }
+
+/**
+ * `POST /workspaces/:id/agents/generate-graph` — a flow drafted from a sentence.
+ *
+ * The backend answers a graph **or** the reasons what the model produced is not
+ * one, and never a half-valid graph: it runs the proposal through the same
+ * checks the publish path uses. So this returns a union and the caller has to
+ * look, which is the point.
+ */
+const generatedGraphSchema = z.union([
+  // The shape is read loosely here for the reason `graph` is `z.unknown()` on
+  // the version above: the backend has already parsed it against the schema the
+  // engine runs and rejected anything that failed, so a second, weaker copy of
+  // those rules on the client could only ever disagree with the real one.
+  z.object({ graph: z.object({ nodes: z.record(z.string(), z.unknown()) }) }),
+  z.object({ errors: z.array(z.string()) }),
+]);
+
+export type GeneratedGraph = z.infer<typeof generatedGraphSchema>;
+
+export async function generateGraph(
+  workspaceId: string,
+  prompt: string,
+): Promise<GeneratedGraph> {
+  const response = await api.post(`workspaces/${workspaceId}/agents/generate-graph`, {
+    json: { prompt },
+    // A model writing a dozen nodes takes longer than the client default, and a
+    // timeout here reads to the user as a refusal rather than as impatience.
+    timeout: 120_000,
+  });
+  return generatedGraphSchema.parse(await response.json());
+}

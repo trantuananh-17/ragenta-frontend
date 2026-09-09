@@ -17,6 +17,7 @@ import {
   createAgent,
   compareVersions,
   createAgentFromTemplate,
+  generateGraph,
   createTrigger,
   deleteAgent,
   deleteTrigger,
@@ -87,6 +88,19 @@ export function useCreateAgent(workspaceId: string) {
 }
 
 /** Agents somebody can start from, with each template's tools marked usable here. */
+/**
+ * Drafts a flow. Writes nothing on the server — what comes back goes into the
+ * canvas, and is saved only if the person publishes a version.
+ */
+export function useGenerateGraph(workspaceId: string) {
+  return useMutation({
+    mutationFn: (prompt: string) => generateGraph(workspaceId, prompt),
+    onError: async (error) => {
+      toast.error("Could not draft the flow", { description: await errorMessage(error) });
+    },
+  });
+}
+
 export function useAgentTemplates(workspaceId: string) {
   return useQuery(agentOptions.templates(workspaceId));
 }

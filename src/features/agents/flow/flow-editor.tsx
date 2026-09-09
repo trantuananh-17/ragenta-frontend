@@ -25,6 +25,7 @@ import { ErrorPolicyFields } from "./error-policy";
 import { FlowNodeBox } from "./flow-node";
 import { NodeParams } from "./node-params";
 import { ValidationPanel } from "./validation-panel";
+import { FlowPrompt } from "./flow-prompt";
 import { hasBlockingProblem, validateFlow } from "./graph-validation";
 import {
   NODE_CATALOGUE,
@@ -221,6 +222,8 @@ function FlowEditorBody({
       </div>
 
       <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto">
+        <FlowPrompt graph={graph} disabled={disabled ?? false} onGenerated={onChange} />
+
         <div className="space-y-2 rounded-lg border p-3">
           <Label className="text-xs">Add a step</Label>
           <div className="grid grid-cols-2 gap-1.5">
