@@ -42,6 +42,16 @@ import {
  * pointing at a node nobody drew is the mistake this whole panel exists to make
  * impossible before publishing.
  */
+/**
+ * `params` arrives as `Record<string, unknown>`, so a list has to be proven to be
+ * one rather than cast to one. A string here — from a drafted graph, or a hand
+ * edit — used to reach `.map` and take the whole agent screen down; an empty
+ * control is something somebody can see and correct.
+ */
+function asStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry) => typeof entry === "string") : [];
+}
+
 export function NodeParams({
   workspaceId,
   graph,
@@ -101,7 +111,7 @@ export function NodeParams({
             <Field label="Tools">
               <div className="space-y-1.5 rounded-md border p-2">
                 {toolIds.map((tool) => {
-                  const selected = (params.tools as string[] | undefined) ?? [];
+                  const selected = asStringList(params.tools);
                   return (
                     <label key={tool} className="flex items-center gap-2 text-xs">
                       <input
@@ -177,7 +187,7 @@ export function NodeParams({
   }
 
   if (node.type === "user_input") {
-    const fields = (params.fields as string[] | undefined) ?? [];
+    const fields = asStringList(params.fields);
     return (
       <div className="space-y-3">
         <Field label="What to ask">

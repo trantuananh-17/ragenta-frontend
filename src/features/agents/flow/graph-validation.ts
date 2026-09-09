@@ -282,7 +282,7 @@ function paramProblems(id: string, name: string, node: FlowNode): GraphProblem[]
 
     case "user_input": {
       required("prompt", "question");
-      const fields = (node.params.fields as string[] | undefined) ?? [];
+      const fields = Array.isArray(node.params.fields) ? node.params.fields : [];
       if (fields.length < 1 || fields.length > 6) {
         problems.push(error(id, `"${name}" needs between one and six answer fields.`));
       }
@@ -346,7 +346,7 @@ function paramProblems(id: string, name: string, node: FlowNode): GraphProblem[]
           one empty cell, which reads as the step having run.
         */
         const rows = String(node.params.rows ?? "").trim();
-        const sheets = (node.params.sheets as unknown[] | undefined) ?? [];
+        const sheets = Array.isArray(node.params.sheets) ? node.params.sheets : [];
         if (rows.length === 0 && sheets.length === 0) {
           problems.push(
             error(id, `"${name}" has no rows to write. Point it at an earlier step's output.`),

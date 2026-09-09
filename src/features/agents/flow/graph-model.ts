@@ -164,16 +164,30 @@ export interface CaseParam {
   to: string;
 }
 
+/**
+ * `params` is `Record<string, unknown>` all the way from the database, so these
+ * three are the boundary where an unchecked value becomes a typed one.
+ *
+ * They check that it is a list rather than casting and hoping. A `categorize`
+ * node whose `categories` is a *string* — which is what a model drafts if it is
+ * told the parameter is one, and what a hand-edited graph can hold — used to
+ * reach `.map` and take the whole agent screen down with "This agent could not be
+ * loaded". A node drawn with no branches is a node somebody can see and fix; a
+ * blank page is not.
+ */
 export function categoriesOf(node: FlowNode): CategoryParam[] {
-  return (node.params.categories as CategoryParam[] | undefined) ?? [];
+  const value = node.params.categories;
+  return Array.isArray(value) ? (value as CategoryParam[]) : [];
 }
 
 export function casesOf(node: FlowNode): CaseParam[] {
-  return (node.params.cases as CaseParam[] | undefined) ?? [];
+  const value = node.params.cases;
+  return Array.isArray(value) ? (value as CaseParam[]) : [];
 }
 
 export function otherwiseOf(node: FlowNode): string[] {
-  return (node.params.otherwise as string[] | undefined) ?? [];
+  const value = node.params.otherwise;
+  return Array.isArray(value) ? (value as string[]).filter((entry) => typeof entry === "string") : [];
 }
 
 /** The handle a `switch` takes when no case matched. `otherwise` holds a list. */
