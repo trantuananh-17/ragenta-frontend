@@ -198,7 +198,20 @@
         if (issued) writeToken(issued);
 
         if (!response.ok || !response.body) {
-          throw new Error("unavailable");
+          // A refusal carries a sentence written for this visitor — today's
+          // limit reached, the agent not activated yet. Throwing it away and
+          // saying "unavailable" is the difference between the shop's owner
+          // knowing what to fix and guessing (ADR-065).
+          return response
+            .json()
+            .catch(function () {
+              return null;
+            })
+            .then(function (body) {
+              var refused = new Error("refused");
+              refused.visitorMessage = body && body.error && body.error.message;
+              throw refused;
+            });
         }
 
         var reader = response.body.getReader();
@@ -253,9 +266,13 @@
           bubble.textContent = "Sorry — no answer came back. Please try again.";
         }
       })
-      .catch(function () {
+      .catch(function (error) {
         bubble.className = "msg err";
-        bubble.textContent = "Sorry — the chat is unavailable right now.";
+        // Only the server's own words, never a thrown network error: "Failed to
+        // fetch" is our vocabulary, not something to show a stranger.
+        bubble.textContent =
+          (error && error.visitorMessage) ||
+          "Sorry — the chat is unavailable right now.";
       })
       .then(function () {
         setSending(false);
