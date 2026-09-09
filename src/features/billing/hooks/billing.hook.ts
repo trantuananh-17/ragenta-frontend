@@ -32,6 +32,10 @@ export function useTransactionsSuspense(workspaceId: string, page: number) {
   return useSuspenseQuery(billingOptions.transactions(workspaceId, page));
 }
 
+export function usePaymentsSuspense(workspaceId: string, page: number) {
+  return useSuspenseQuery(billingOptions.payments(workspaceId, page));
+}
+
 export function usePlanCatalogueSuspense() {
   return useSuspenseQuery(billingOptions.plans());
 }

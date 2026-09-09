@@ -30,8 +30,10 @@ import {
   usePlanCatalogueSuspense,
   usePromoRedemptionsSuspense,
   useRedeemPromoCode,
+  usePaymentsSuspense,
   useTransactionsSuspense,
 } from "../hooks/billing.hook";
+import type { BillingSummary } from "../service/billing.service";
 import type { PlanOption } from "../service/billing.service";
 
 function planPrice(plan: PlanOption): string {
@@ -113,6 +115,8 @@ export function BillingScreen() {
           value={`${summary.data.seats.used} / ${summary.data.seats.limit ?? "∞"}`}
         />
       </StatCardGrid>
+
+      <RenewalNotice subscription={summary.data.subscription} plan={current} />
 
       <DetailSection
         title="Plans"
@@ -271,6 +275,7 @@ export function BillingScreen() {
         )}
       </DetailSection>
 
+      {mayPay && <InvoicesSection />}
       {mayPay && <TransactionsSection />}
     </div>
   );
@@ -281,6 +286,171 @@ export function BillingScreen() {
  * member never mounts this query at all — the backend would answer 403 and an
  * error card on an otherwise healthy page reads as a bug.
  */
+/**
+ * When the plan renews, and whether it will.
+ *
+ * Stripe answered both of these from the first release and the API wrote them to
+ * the subscription row, but nothing ever read them back out — so "when am I
+ * charged next" and "did my cancellation take" had no answer anywhere in the
+ * product. A cancelled subscription is the case worth being loud about: it keeps
+ * working right up to a date, and the date is the only warning.
+ */
+function RenewalNotice({
+  subscription,
+  plan,
+}: {
+  subscription: BillingSummary["subscription"];
+  plan: string;
+}) {
+  // A workspace that never went through checkout has no period to report, and a
+  // card saying "renews: never" is worse than no card.
+  if (!subscription?.periodEnd) return null;
+
+  const ends = formatDate(subscription.periodEnd);
+  const cancelling = subscription.cancelAtPeriodEnd;
+
+  return (
+    <Alert variant={cancelling ? "destructive" : "default"}>
+      <AlertTitle>
+        {cancelling ? `Cancels on ${ends}` : `Renews on ${ends}`}
+      </AlertTitle>
+      <AlertDescription>
+        {cancelling ? (
+          <>
+            The <span className="capitalize">{plan}</span> plan stays active until
+            then, and the workspace drops to free afterwards. Reopen the payment
+            portal to keep it.
+          </>
+        ) : (
+          <>
+            The <span className="capitalize">{plan}</span> plan renews automatically
+            {subscription.seats ? ` for ${subscription.seats} seat${subscription.seats === 1 ? "" : "s"}` : ""}
+            . Manage the card or cancel in the payment portal.
+          </>
+        )}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/**
+ * What was actually paid, separate from the credit ledger below it.
+ *
+ * A payment and a credit movement are different facts in different units, and a
+ * single table carrying both would have an "amount" column meaning dollars on one
+ * row and credits on the next.
+ */
+function InvoicesSection() {
+  const { workspace } = useWorkspace();
+  const [page, setPage] = useState(0);
+  const payments = usePaymentsSuspense(workspace.id, page);
+
+  const { items, total, limit, offset } = payments.data;
+  const lastPage = Math.max(0, Math.ceil(total / limit) - 1);
+
+  return (
+    <DetailSection
+      title="Invoices"
+      description="Every charge, successful or not. A failed one is kept because it is the reason a plan is about to lapse."
+      actions={
+        total > limit ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {offset + 1}–{offset + items.length} of {total}
+            </span>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Newer invoices"
+              disabled={page === 0}
+              onClick={() => setPage(page - 1)}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Older invoices"
+              disabled={page >= lastPage}
+              onClick={() => setPage(page + 1)}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        ) : undefined
+      }
+    >
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Date</TableHead>
+            <TableHead>Description</TableHead>
+            <TableHead>Period</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Amount</TableHead>
+            <TableHead className="w-0" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.length === 0 && (
+            <TableRow>
+              <TableCell
+                colSpan={6}
+                className="py-10 text-center text-sm text-muted-foreground"
+              >
+                Nothing has been charged yet.
+              </TableCell>
+            </TableRow>
+          )}
+          {items.map((payment) => (
+            <TableRow key={payment.id}>
+              <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
+                {formatDate(payment.createdAt)}
+              </TableCell>
+              <TableCell className="text-sm">{payment.description}</TableCell>
+              <TableCell className="text-xs text-muted-foreground">
+                {payment.periodStart && payment.periodEnd
+                  ? `${formatDate(payment.periodStart)} — ${formatDate(payment.periodEnd)}`
+                  : "—"}
+              </TableCell>
+              <TableCell>
+                <StatusBadge
+                  tone={
+                    payment.status === "paid"
+                      ? "success"
+                      : payment.status === "failed"
+                        ? "danger"
+                        : "neutral"
+                  }
+                >
+                  {payment.status}
+                </StatusBadge>
+              </TableCell>
+              <TableCell className="text-right text-sm tabular-nums">
+                {formatUsd(payment.amountUsd)}
+              </TableCell>
+              <TableCell className="text-right">
+                {payment.hostedInvoiceUrl && (
+                  <Button variant="ghost" size="sm" asChild>
+                    <a
+                      href={payment.hostedInvoiceUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      <ExternalLink className="size-4" />
+                      Receipt
+                    </a>
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </DetailSection>
+  );
+}
+
 function TransactionsSection() {
   const { workspace } = useWorkspace();
   const [page, setPage] = useState(0);

@@ -3,6 +3,7 @@ import { queryOptions } from "@tanstack/react-query";
 import {
   getAutoReload,
   getBillingSummary,
+  getPayments,
   getPlanCatalogue,
   getPromoRedemptions,
   getTransactions,
@@ -14,6 +15,8 @@ export const billingKeys = {
     [...billingKeys.all(), "summary", workspaceId] as const,
   transactions: (workspaceId: string, page: number) =>
     [...billingKeys.all(), "transactions", workspaceId, page] as const,
+  payments: (workspaceId: string, page: number) =>
+    [...billingKeys.all(), "payments", workspaceId, page] as const,
   plans: () => [...billingKeys.all(), "plans"] as const,
   autoReload: (workspaceId: string) =>
     [...billingKeys.all(), "auto-reload", workspaceId] as const,
@@ -33,6 +36,12 @@ export const billingOptions = {
       queryFn: () => getTransactions(workspaceId, page),
       // The previous page stays on screen while the next one loads, so paging
       // does not blank the table it is paging.
+      placeholderData: (previous) => previous,
+    }),
+  payments: (workspaceId: string, page: number) =>
+    queryOptions({
+      queryKey: billingKeys.payments(workspaceId, page),
+      queryFn: () => getPayments(workspaceId, page),
       placeholderData: (previous) => previous,
     }),
   plans: () =>

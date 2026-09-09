@@ -47,6 +47,22 @@ export const billingSummarySchema = z.object({
     used: z.number(),
     limit: z.number().nullable(),
   }),
+  /**
+   * When the plan renews, and whether it will.
+   *
+   * `nullish` because a deployment running an older API answers without it, and a
+   * screen that threw on the missing field would be a blank billing page rather
+   * than one missing a card.
+   */
+  subscription: z
+    .object({
+      status: z.string(),
+      periodEnd: z.coerce.string().nullable(),
+      cancelAtPeriodEnd: z.boolean(),
+      billingInterval: z.string().nullable(),
+      seats: z.number().nullable(),
+    })
+    .nullish(),
 });
 
 export const workspaceOverviewSchema = z.object({

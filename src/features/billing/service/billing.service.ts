@@ -24,6 +24,40 @@ export const creditTransactionSchema = z.object({
 
 export const transactionsPageSchema = pageSchema(creditTransactionSchema);
 
+/**
+ * A payment, which is not a credit movement.
+ *
+ * The ledger says what may be spent; this says what was paid for it. Keeping
+ * them in separate tables and separate screens is what stops one "amount" column
+ * meaning credits on one row and dollars on the next.
+ */
+export const paymentSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  status: z.string(),
+  amountUsd: z.coerce.number(),
+  currency: z.string(),
+  description: z.string(),
+  hostedInvoiceUrl: z.string().nullable(),
+  invoicePdfUrl: z.string().nullable(),
+  periodStart: z.coerce.string().nullable(),
+  periodEnd: z.coerce.string().nullable(),
+  createdAt: z.coerce.string(),
+});
+
+export const paymentsPageSchema = pageSchema(paymentSchema);
+
+export type Payment = z.infer<typeof paymentSchema>;
+
+export const PAYMENTS_PAGE_SIZE = 20;
+
+export async function getPayments(workspaceId: string, page: number) {
+  const response = await api.get(`workspaces/${workspaceId}/billing/payments`, {
+    searchParams: { limit: PAYMENTS_PAGE_SIZE, offset: page * PAYMENTS_PAGE_SIZE },
+  });
+  return paymentsPageSchema.parse(await response.json());
+}
+
 export const topupPackSchema = z.object({
   id: z.string(),
   credits: z.number(),
