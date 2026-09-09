@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +27,14 @@ import { useWidgetUsage } from "../hooks/widgets.hook";
 import type { Widget, WidgetUsage } from "../service/widgets.service";
 
 const RANGES = [7, 30, 90] as const;
+
+/**
+ * The log is paged rather than scrolled inside a fixed box. Thirty rows in a
+ * dialog that also has to hold the ceiling, the totals and a chart makes a
+ * column so tall the numbers at the top leave the screen — which is what a
+ * scrolling table inside a modal always turns into.
+ */
+const LOG_PAGE_SIZE = 8;
 
 const whole = new Intl.NumberFormat("en");
 
@@ -69,7 +79,7 @@ export function WidgetActivityDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>{widget.name}</DialogTitle>
           <DialogDescription>
@@ -105,7 +115,7 @@ export function WidgetActivityDialog({
             <Skeleton className="h-40 w-full" />
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="max-h-[65vh] space-y-5 overflow-y-auto pr-1">
             <TodayCeiling today={data.today} />
             <Totals totals={data.totals} />
             <DailyMessages rows={data.daily} />
@@ -168,7 +178,7 @@ function DailyMessages({ rows }: { rows: WidgetUsage["daily"] }) {
   return (
     <div className="rounded-md border p-3">
       <p className="text-sm font-medium">Messages per day</p>
-      <div className="mt-3 flex h-20 items-end gap-1">
+      <div className="mt-3 flex h-16 items-end gap-1">
         {rows.map((row) => (
           <div
             key={row.day}
@@ -191,6 +201,15 @@ function DailyMessages({ rows }: { rows: WidgetUsage["daily"] }) {
 }
 
 function RecentLog({ rows }: { rows: WidgetUsage["recent"] }) {
+  const [page, setPage] = useState(0);
+
+  const pages = Math.max(1, Math.ceil(rows.length / LOG_PAGE_SIZE));
+  // Clamped rather than reset in an effect: switching the range can shorten the
+  // list under a page that is already open, and a blank table is a worse answer
+  // than the last page of what is there.
+  const current = Math.min(page, pages - 1);
+  const visible = rows.slice(current * LOG_PAGE_SIZE, current * LOG_PAGE_SIZE + LOG_PAGE_SIZE);
+
   if (rows.length === 0) {
     return (
       <p className="rounded-md border border-dashed px-3 py-8 text-center text-sm text-muted-foreground">
@@ -201,8 +220,34 @@ function RecentLog({ rows }: { rows: WidgetUsage["recent"] }) {
 
   return (
     <div className="rounded-md border">
-      <p className="border-b px-3 py-2 text-sm font-medium">Recent conversations</p>
-      <div className="max-h-80 overflow-auto">
+      <div className="flex items-center justify-between border-b px-3 py-2">
+        <p className="text-sm font-medium">Recent conversations</p>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {current * LOG_PAGE_SIZE + 1}–{current * LOG_PAGE_SIZE + visible.length} of{" "}
+            {rows.length}
+          </span>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Previous page"
+            disabled={current === 0}
+            onClick={() => setPage(current - 1)}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Next page"
+            disabled={current >= pages - 1}
+            onClick={() => setPage(current + 1)}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -214,7 +259,7 @@ function RecentLog({ rows }: { rows: WidgetUsage["recent"] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((row) => (
+            {visible.map((row) => (
               <TableRow key={row.id}>
                 <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                   {when(row.createdAt)}

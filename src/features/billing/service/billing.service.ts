@@ -83,9 +83,18 @@ export async function getBillingSummary(workspaceId: string) {
   return billingSummarySchema.parse(await response.json());
 }
 
-export async function getTransactions(workspaceId: string) {
+/**
+ * The credit ledger, a page at a time.
+ *
+ * It used to ask for the first fifty and stop, which read as "this is all that
+ * ever happened" — a workspace that has been running for a month has thousands
+ * of rows, and the fifty-first was unreachable rather than merely off screen.
+ */
+export const LEDGER_PAGE_SIZE = 50;
+
+export async function getTransactions(workspaceId: string, page: number) {
   const response = await api.get(`workspaces/${workspaceId}/billing/transactions`, {
-    searchParams: { limit: 50, offset: 0 },
+    searchParams: { limit: LEDGER_PAGE_SIZE, offset: page * LEDGER_PAGE_SIZE },
   });
   return transactionsPageSchema.parse(await response.json());
 }

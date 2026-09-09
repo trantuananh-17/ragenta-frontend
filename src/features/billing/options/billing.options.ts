@@ -12,8 +12,8 @@ export const billingKeys = {
   all: () => ["billing"] as const,
   summary: (workspaceId: string) =>
     [...billingKeys.all(), "summary", workspaceId] as const,
-  transactions: (workspaceId: string) =>
-    [...billingKeys.all(), "transactions", workspaceId] as const,
+  transactions: (workspaceId: string, page: number) =>
+    [...billingKeys.all(), "transactions", workspaceId, page] as const,
   plans: () => [...billingKeys.all(), "plans"] as const,
   autoReload: (workspaceId: string) =>
     [...billingKeys.all(), "auto-reload", workspaceId] as const,
@@ -27,10 +27,13 @@ export const billingOptions = {
       queryKey: billingKeys.summary(workspaceId),
       queryFn: () => getBillingSummary(workspaceId),
     }),
-  transactions: (workspaceId: string) =>
+  transactions: (workspaceId: string, page: number) =>
     queryOptions({
-      queryKey: billingKeys.transactions(workspaceId),
-      queryFn: () => getTransactions(workspaceId),
+      queryKey: billingKeys.transactions(workspaceId, page),
+      queryFn: () => getTransactions(workspaceId, page),
+      // The previous page stays on screen while the next one loads, so paging
+      // does not blank the table it is paging.
+      placeholderData: (previous) => previous,
     }),
   plans: () =>
     queryOptions({

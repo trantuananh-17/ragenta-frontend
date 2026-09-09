@@ -28,8 +28,8 @@ export function useBillingSummary(workspaceId: string) {
   return useQuery(billingOptions.summary(workspaceId));
 }
 
-export function useTransactionsSuspense(workspaceId: string) {
-  return useSuspenseQuery(billingOptions.transactions(workspaceId));
+export function useTransactionsSuspense(workspaceId: string, page: number) {
+  return useSuspenseQuery(billingOptions.transactions(workspaceId, page));
 }
 
 export function usePlanCatalogueSuspense() {

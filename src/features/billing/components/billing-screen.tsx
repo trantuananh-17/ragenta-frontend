@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, ExternalLink, Gift, Zap } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ExternalLink, Gift, Zap } from "lucide-react";
 
 import { DetailSection } from "@/components/detail-shell";
 import { StatCard, StatCardGrid } from "@/components/stat-card";
@@ -283,12 +283,43 @@ export function BillingScreen() {
  */
 function TransactionsSection() {
   const { workspace } = useWorkspace();
-  const transactions = useTransactionsSuspense(workspace.id);
+  const [page, setPage] = useState(0);
+  const transactions = useTransactionsSuspense(workspace.id, page);
+
+  const { items, total, limit, offset } = transactions.data;
+  const lastPage = Math.max(0, Math.ceil(total / limit) - 1);
 
   return (
     <DetailSection
       title="Credit ledger"
       description="Every movement, in and out. The balance above is the sum of these rows — there is no separate total that can disagree with them."
+      actions={
+        total > limit ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {offset + 1}–{offset + items.length} of {total}
+            </span>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Newer movements"
+              disabled={page === 0}
+              onClick={() => setPage(page - 1)}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Older movements"
+              disabled={page >= lastPage}
+              onClick={() => setPage(page + 1)}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        ) : undefined
+      }
     >
       <Table>
         <TableHeader>
@@ -301,7 +332,7 @@ function TransactionsSection() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {transactions.data.items.length === 0 && (
+          {items.length === 0 && (
             <TableRow>
               <TableCell
                 colSpan={5}
@@ -311,7 +342,7 @@ function TransactionsSection() {
               </TableCell>
             </TableRow>
           )}
-          {transactions.data.items.map((transaction) => (
+          {items.map((transaction) => (
             <TableRow key={transaction.id}>
               <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
                 {formatDateTime(transaction.createdAt)}
