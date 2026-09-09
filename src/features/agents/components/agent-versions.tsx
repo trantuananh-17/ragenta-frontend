@@ -196,7 +196,7 @@ function ChangeRow({ change }: { change: FieldChange }) {
           {added.map((entry) => (
             <span
               key={`add-${entry}`}
-              className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-xs text-emerald-700 dark:text-emerald-400"
+              className="rounded-sm bg-success/10 px-1.5 py-0.5 font-mono text-xs text-success"
             >
               + {entry}
             </span>
@@ -204,7 +204,7 @@ function ChangeRow({ change }: { change: FieldChange }) {
           {removed.map((entry) => (
             <span
               key={`remove-${entry}`}
-              className="rounded bg-red-500/10 px-1.5 py-0.5 font-mono text-xs text-red-700 line-through dark:text-red-400"
+              className="rounded-sm bg-destructive/10 px-1.5 py-0.5 font-mono text-xs text-destructive line-through"
             >
               {entry}
             </span>
@@ -224,10 +224,10 @@ function ChangeRow({ change }: { change: FieldChange }) {
       <div>
         <p className="text-sm font-medium">{change.label}</p>
         <div className="mt-1 grid gap-2 md:grid-cols-2">
-          <pre className="max-h-48 overflow-auto rounded border bg-red-500/5 p-2 text-xs whitespace-pre-wrap">
+          <pre className="max-h-48 overflow-auto rounded-md border bg-destructive/5 p-2 text-xs whitespace-pre-wrap">
             {display(change.before)}
           </pre>
-          <pre className="max-h-48 overflow-auto rounded border bg-emerald-500/5 p-2 text-xs whitespace-pre-wrap">
+          <pre className="max-h-48 overflow-auto rounded-md border bg-success/5 p-2 text-xs whitespace-pre-wrap">
             {display(change.after)}
           </pre>
         </div>

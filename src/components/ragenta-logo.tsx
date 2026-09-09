@@ -11,7 +11,7 @@ export function RagentaLogoMark({ className }: { className?: string }) {
     <span
       aria-hidden
       className={cn(
-        "flex size-6 shrink-0 items-center justify-center rounded-md bg-primary text-[13px] font-bold text-primary-foreground",
+        "flex size-6 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground",
         className,
       )}
     >

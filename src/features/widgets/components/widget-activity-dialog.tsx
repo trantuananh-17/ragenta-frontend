@@ -96,7 +96,7 @@ export function WidgetActivityDialog({
                 type="button"
                 onClick={() => setDays(range)}
                 className={cn(
-                  "rounded px-3 py-1 text-sm transition-colors",
+                  "rounded-sm px-3 py-1 text-sm transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
                   range === days
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground",

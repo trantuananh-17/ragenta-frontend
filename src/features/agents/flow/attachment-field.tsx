@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Loader2, Paperclip, X } from "lucide-react";
+import { Paperclip, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import { uploadAttachment } from "@/features/chat/service/chat.service";
 import { errorMessage } from "@/lib/api-error";
 
@@ -72,7 +73,7 @@ export function AttachmentField({
           onClick={() => fileRef.current?.click()}
         >
           {uploading ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Spinner />
           ) : (
             <Paperclip className="size-4" />
           )}

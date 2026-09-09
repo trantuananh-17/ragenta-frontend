@@ -29,7 +29,7 @@ export function StatCard({
   return (
     <div className={cn("rounded-lg border bg-background p-4", className)}>
       <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-medium text-muted-foreground uppercase">
+        <p className="text-xs font-medium text-muted-foreground">
           {label}
         </p>
         {icon && <span className="text-muted-foreground">{icon}</span>}

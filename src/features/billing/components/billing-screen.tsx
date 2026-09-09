@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -381,7 +382,8 @@ export function BillingScreen() {
             disabled={!mayPay || redeem.isPending || code.trim().length === 0}
           >
             <Gift className="size-4" />
-            {redeem.isPending ? "Redeeming..." : "Redeem"}
+            {redeem.isPending && <Spinner data-icon="inline-start" />}
+            Redeem
           </Button>
         </form>
 
@@ -649,7 +651,7 @@ function TransactionsSection() {
                   "text-right text-xs tabular-nums",
                   transaction.amount < 0
                     ? "text-muted-foreground"
-                    : "text-emerald-700 dark:text-emerald-400",
+                    : "text-success",
                 )}
               >
                 {transaction.amount > 0 ? "+" : ""}

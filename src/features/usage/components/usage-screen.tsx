@@ -143,7 +143,7 @@ export function UsageScreen() {
                     tickLine={false}
                     axisLine={false}
                     tickMargin={8}
-                    className="text-[10px]"
+                    className="text-xs"
                   />
                   <YAxis tickLine={false} axisLine={false} width={56} />
                   <ChartTooltip content={<ChartTooltipContent />} />
@@ -184,10 +184,10 @@ export function UsageScreen() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>When</TableHead>
-                    <TableHead>Operation</TableHead>
-                    <TableHead>Model</TableHead>
-                    <TableHead className="text-right">In</TableHead>
-                    <TableHead className="text-right">Out</TableHead>
+                    <TableHead className="hidden md:table-cell">Operation</TableHead>
+                    <TableHead className="hidden lg:table-cell">Model</TableHead>
+                    <TableHead className="hidden text-right lg:table-cell">In</TableHead>
+                    <TableHead className="hidden text-right lg:table-cell">Out</TableHead>
                     <TableHead className="text-right">Credits</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -207,19 +207,21 @@ export function UsageScreen() {
                       <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
                         {formatDateTime(record.createdAt)}
                       </TableCell>
-                      <TableCell className="text-xs">{record.operation}</TableCell>
-                      <TableCell className="max-w-[220px] truncate text-xs">
+                      <TableCell className="hidden text-xs md:table-cell">
+                        {record.operation}
+                      </TableCell>
+                      <TableCell className="hidden max-w-[220px] truncate text-xs lg:table-cell">
                         {record.model}
                         <span className="ml-1 text-muted-foreground">
                           {record.provider}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right text-xs tabular-nums">
+                      <TableCell className="hidden text-right text-xs tabular-nums lg:table-cell">
                         {formatNumber(
                           record.inputTokens + record.embeddingTokens,
                         )}
                       </TableCell>
-                      <TableCell className="text-right text-xs tabular-nums">
+                      <TableCell className="hidden text-right text-xs tabular-nums lg:table-cell">
                         {formatNumber(record.outputTokens)}
                       </TableCell>
                       <TableCell className="text-right text-xs tabular-nums">

@@ -49,7 +49,7 @@ export function ProviderErrorsPanel({ workspaceId }: { workspaceId: string }) {
   if (errors.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
-        <CheckCircle2 className="size-8 text-emerald-600" />
+        <CheckCircle2 className="size-8 text-success" />
         <p className="font-medium">No provider call has failed</p>
         <p className="max-w-md text-sm text-muted-foreground">
           Nothing is written here unless a call to a model provider failed, so an

@@ -56,19 +56,19 @@ function NodeReferences({ graph, selected }: { graph: AgentGraph; selected: stri
 
   return (
     <div className="space-y-1.5 rounded-md bg-muted/40 p-2">
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         This step&apos;s id — what other steps write to reach its output
       </p>
       <code className="block font-mono text-xs">{selected}</code>
 
       {others.length > 0 && (
         <>
-          <p className="pt-1 text-[11px] text-muted-foreground">
+          <p className="pt-1 text-xs text-muted-foreground">
             Paste one of these into a prompt to use an earlier step&apos;s output
           </p>
           <ul className="space-y-0.5">
             {others.map(([id, other]) => (
-              <li key={id} className="flex items-baseline gap-1.5 text-[11px]">
+              <li key={id} className="flex items-baseline gap-1.5 text-xs">
                 <code className="font-mono">{`{{${id}.text}}`}</code>
                 <span className="truncate text-muted-foreground">
                   {other.label || other.type}
@@ -288,7 +288,7 @@ function FlowEditorBody({
               </Button>
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Drag one onto the canvas to place it, or click to drop it beside the
             last step.
           </p>
@@ -307,7 +307,7 @@ function FlowEditorBody({
               <div className="flex items-center justify-between gap-2">
                 <Label className="text-xs">
                   {NODE_CATALOGUE[node.type].title}
-                  <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                  <span className="ml-1 font-mono text-xs text-muted-foreground">
                     {selected}
                   </span>
                 </Label>

@@ -3,20 +3,33 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Inline callout. One implementation for both consoles — the customer app and
+ * the admin console import the same variants, so a warning means the same thing
+ * and looks the same on either side.
+ *
+ * The status variants carry a tinted background rather than the bare `bg-card`
+ * of upstream's default: an Alert here is used inside a page, surrounded by
+ * other bordered surfaces, and without a tint it reads as one more panel.
+ */
 const alertVariants = cva(
-  "relative grid w-full grid-cols-[0_1fr] items-start gap-y-0.5 rounded-lg border px-4 py-3 text-sm has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] has-[>svg]:gap-x-3 [&>svg]:size-4 [&>svg]:translate-y-0.5",
+  "group/alert relative grid w-full gap-0.5 rounded-lg border px-2.5 py-2 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default: "bg-card text-card-foreground",
-        info: "border-sky-500/25 bg-sky-500/10 text-sky-800 dark:text-sky-300 [&>svg]:text-sky-600 dark:[&>svg]:text-sky-400",
-        warning:
-          "border-amber-500/25 bg-amber-500/10 text-amber-800 dark:text-amber-300 [&>svg]:text-amber-600 dark:[&>svg]:text-amber-400",
         destructive:
-          "border-destructive/30 bg-destructive/10 text-destructive [&>svg]:text-destructive",
+          "border-destructive/25 bg-destructive/10 text-destructive *:data-[slot=alert-description]:text-destructive/90",
+        success:
+          "border-success/25 bg-success/10 text-success *:data-[slot=alert-description]:text-success/90",
+        warning:
+          "border-warning/25 bg-warning/10 text-warning *:data-[slot=alert-description]:text-warning/90",
+        info: "border-info/25 bg-info/10 text-info *:data-[slot=alert-description]:text-info/90",
       },
     },
-    defaultVariants: { variant: "default" },
+    defaultVariants: {
+      variant: "default",
+    },
   }
 )
 
@@ -40,7 +53,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="alert-title"
       className={cn(
-        "col-start-2 min-h-4 font-medium tracking-tight",
+        "font-medium group-has-[>svg]/alert:col-start-2 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground",
         className
       )}
       {...props}
@@ -48,12 +61,15 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function AlertDescription({ className, ...props }: React.ComponentProps<"div">) {
+function AlertDescription({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="alert-description"
       className={cn(
-        "col-start-2 grid justify-items-start gap-1 text-sm opacity-90 [&_p]:leading-relaxed",
+        "text-sm text-balance text-muted-foreground group-has-[>svg]/alert:col-start-2 md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
         className
       )}
       {...props}
@@ -61,4 +77,15 @@ function AlertDescription({ className, ...props }: React.ComponentProps<"div">) 
   )
 }
 
-export { Alert, AlertTitle, AlertDescription }
+/** Top-right slot for a single action — dismiss, retry, "see the log". */
+function AlertAction({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="alert-action"
+      className={cn("absolute top-2 right-2", className)}
+      {...props}
+    />
+  )
+}
+
+export { Alert, AlertTitle, AlertDescription, AlertAction }

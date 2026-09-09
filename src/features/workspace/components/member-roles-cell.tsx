@@ -107,7 +107,7 @@ export function MemberRolesCell({
               const checked = heldCustom.some((entry) => entry.id === role.id);
               return (
                 <li key={role.id}>
-                  <label className="flex cursor-pointer items-start gap-2 rounded px-2 py-2 hover:bg-muted/60">
+                  <label className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 hover:bg-muted/60">
                     <Checkbox
                       className="mt-0.5"
                       checked={checked}

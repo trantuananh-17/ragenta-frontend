@@ -4,10 +4,12 @@ import { useState } from "react";
 import { AlertCircle, BarChart3, Globe, Plus, Trash2 } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CopyButton } from "@/components/copy-button";
 import { WidgetActivityDialog } from "./widget-activity-dialog";
 import { DetailSection } from "@/components/detail-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -158,27 +160,15 @@ export function WidgetsScreen() {
 
 /** The two lines somebody pastes. Rendered from the browser's own origin. */
 function EmbedSnippet({ publicKey }: { publicKey: string }) {
-  const [copied, setCopied] = useState(false);
   const snippet = embedSnippet(publicKey);
 
   return (
     <div className="mt-3 space-y-1">
       <div className="flex items-center gap-2">
-        <code className="min-w-0 flex-1 overflow-x-auto rounded bg-muted px-2 py-1.5 font-mono text-xs">
+        <code className="min-w-0 flex-1 overflow-x-auto rounded-sm bg-muted px-2 py-1.5 font-mono text-xs">
           {snippet}
         </code>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            void navigator.clipboard.writeText(snippet).then(() => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1_500);
-            });
-          }}
-        >
-          {copied ? "Copied" : "Copy"}
-        </Button>
+        <CopyButton value={snippet} label="Copy" />
       </div>
       <p className="text-xs text-muted-foreground">
         Paste it before <code className="font-mono">&lt;/body&gt;</code>. The key is meant to be
@@ -366,7 +356,8 @@ function WidgetForm({
               )
             }
           >
-            {save.isPending ? "Saving..." : widget ? "Save" : "Publish"}
+            {save.isPending && <Spinner data-icon="inline-start" />}
+            {widget ? "Save" : "Publish"}
           </Button>
         </div>
       </div>

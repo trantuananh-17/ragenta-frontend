@@ -6,6 +6,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Dialog,
   DialogContent,
@@ -341,7 +342,8 @@ export function CreateKnowledgeBaseDialog({
             form="create-knowledge-base"
             disabled={create.isPending || blocked}
           >
-            {create.isPending ? "Creating..." : "Create"}
+            {create.isPending && <Spinner data-icon="inline-start" />}
+              Create
           </Button>
         </DialogFooter>
       </DialogContent>

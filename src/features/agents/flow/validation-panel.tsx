@@ -34,7 +34,7 @@ export function ValidationPanel({
 
       {problems.length === 0 ? (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <CheckCircle2 className="size-3.5 text-emerald-600" />
+          <CheckCircle2 className="size-3.5 text-success" />
           Nothing to fix.
         </p>
       ) : (
@@ -48,14 +48,14 @@ export function ValidationPanel({
                   disabled={!problem.nodeId}
                   onClick={() => problem.nodeId && onSelect(problem.nodeId)}
                   className={cn(
-                    "flex w-full items-start gap-1.5 rounded-md px-1.5 py-1 text-left text-[11px] leading-snug",
+                    "flex w-full items-start gap-1.5 rounded-md px-1.5 py-1 text-left text-xs leading-snug focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
                     problem.nodeId && "hover:bg-muted",
                   )}
                 >
                   <Icon
                     className={cn(
                       "mt-px size-3.5 shrink-0",
-                      problem.level === "error" ? "text-destructive" : "text-amber-600",
+                      problem.level === "error" ? "text-destructive" : "text-warning",
                     )}
                   />
                   <span>{problem.message}</span>

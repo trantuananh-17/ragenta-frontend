@@ -40,7 +40,7 @@ type NavGroup = { label?: string; items: NavItem[] };
  * The nav is the product's table of contents. Work first — what someone opens
  * the app to do — then the workspace's own administration.
  */
-const navGroups: NavGroup[] = [
+export const navGroups: NavGroup[] = [
   {
     items: [
       { title: "Chat", icon: MessagesSquare, url: "/chat" },
@@ -82,9 +82,10 @@ function SidebarTabToggle({
         <button
           key={candidate}
           type="button"
+          aria-pressed={candidate === tab}
           onClick={() => onChange(candidate)}
           className={cn(
-            "flex-1 rounded-md px-2 py-1 text-xs font-medium capitalize transition-colors",
+            "flex-1 rounded-md px-2 py-1 text-xs font-medium capitalize transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
             candidate === tab
               ? "bg-background text-foreground shadow-xs"
               : "text-muted-foreground hover:text-foreground",

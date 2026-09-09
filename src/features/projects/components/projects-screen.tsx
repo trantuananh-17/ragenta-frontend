@@ -14,6 +14,7 @@ import {
 } from "@/components/entity-components";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Dialog,
   DialogContent,
@@ -100,7 +101,8 @@ function CreateProjectDialog({
             Cancel
           </Button>
           <Button type="submit" form="create-project" disabled={create.isPending}>
-            {create.isPending ? "Creating..." : "Create"}
+            {create.isPending && <Spinner data-icon="inline-start" />}
+            Create
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -166,7 +168,7 @@ export function ProjectsScreen() {
                 <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground">
                   {project.description || "No description."}
                 </p>
-                <p className="mt-3 text-[11px] text-muted-foreground">
+                <p className="mt-3 text-xs text-muted-foreground">
                   {project.chatModel
                     ? `Pinned to ${project.chatModel}`
                     : "Uses the workspace model"}{" "}

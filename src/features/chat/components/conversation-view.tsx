@@ -127,11 +127,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
             {conversation.data.title}
           </h1>
           {conversation.data.knowledgeBaseId ? (
-            <Badge variant="secondary" className="shrink-0 text-[11px]">
+            <Badge variant="secondary" className="shrink-0 text-xs">
               grounded
             </Badge>
           ) : (
-            <Badge variant="outline" className="shrink-0 text-[11px]">
+            <Badge variant="outline" className="shrink-0 text-xs">
               no retrieval
             </Badge>
           )}

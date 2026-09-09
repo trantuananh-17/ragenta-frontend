@@ -84,7 +84,7 @@ export function AnswerBody({
             className ? (
               <code className={cn("text-xs", className)}>{children}</code>
             ) : (
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              <code className="rounded-sm bg-muted px-1 py-0.5 text-xs">
                 {children}
               </code>
             ),
@@ -186,7 +186,7 @@ function MessageTime({
       dateTime={at}
       title={formatDateTime(at)}
       className={cn(
-        "pointer-events-none absolute top-full z-10 mt-px rounded-sm bg-background/90 px-1 text-[10px] leading-none font-medium whitespace-nowrap text-muted-foreground opacity-0 transition-opacity duration-150 select-none group-hover/message:opacity-100 group-focus-within/message:opacity-100 motion-reduce:transition-none",
+        "pointer-events-none absolute top-full z-10 mt-px rounded-sm bg-background/90 px-1 text-xs leading-none font-medium whitespace-nowrap text-muted-foreground opacity-0 transition-opacity duration-150 select-none group-hover/message:opacity-100 group-focus-within/message:opacity-100 motion-reduce:transition-none",
         // A hover reveal is nothing at all on a touch screen: Tailwind compiles
         // `hover:` inside `@media (hover: hover)`, so a phone would never show a
         // time — and the inline clock this replaced is gone. Where there is no
@@ -293,7 +293,7 @@ export function ChatMessage({
           {(message.model || elapsed !== null) && (
             <p
               title={answerTitle(message.createdAt, askedAt)}
-              className="text-[11px] text-muted-foreground tabular-nums"
+              className="text-xs text-muted-foreground tabular-nums"
             >
               {message.model && (
                 <>

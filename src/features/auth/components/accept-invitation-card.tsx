@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Card,
   CardContent,
@@ -48,7 +49,8 @@ export function AcceptInvitationCard({
           disabled={accept.isPending}
           onClick={() => accept.mutate(invitationId)}
         >
-          {accept.isPending ? "Joining..." : "Accept invitation"}
+          {accept.isPending && <Spinner data-icon="inline-start" />}
+          Accept invitation
         </Button>
         <Link
           href="/chat"

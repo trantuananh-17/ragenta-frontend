@@ -8,6 +8,7 @@ import { DetailShell, DetailSection } from "@/components/detail-shell";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -105,7 +106,8 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
               update.mutate({ name, description: description || null })
             }
           >
-            {update.isPending ? "Saving..." : "Save"}
+            {update.isPending && <Spinner data-icon="inline-start" />}
+              Save
           </Button>
         }
       >

@@ -112,7 +112,7 @@ function TemplateGallery({
               key={template.id}
               type="button"
               onClick={() => onChoose(template)}
-              className="w-full rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+              className="w-full rounded-lg border p-3 text-left transition-colors hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
             >
               <span className="flex items-center gap-2 text-sm font-medium">
                 <Sparkles className="size-4 text-muted-foreground" />
@@ -122,7 +122,7 @@ function TemplateGallery({
                 {template.summary}
               </span>
               {missing.length > 0 && (
-                <span className="mt-1 block text-xs text-amber-700 dark:text-amber-400">
+                <span className="mt-1 block text-xs text-warning">
                   {missing.map((tool) => tool.title).join(", ")} not available here —
                   it will be created without{" "}
                   {missing.length === 1 ? "that tool" : "those tools"}.
@@ -135,7 +135,7 @@ function TemplateGallery({
         <button
           type="button"
           onClick={() => onChoose("blank")}
-          className="w-full rounded-lg border border-dashed p-3 text-left transition-colors hover:bg-accent"
+          className="w-full rounded-lg border border-dashed p-3 text-left transition-colors hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
         >
           <span className="text-sm font-medium">Start from nothing</span>
           <span className="mt-1 block text-xs text-muted-foreground">
@@ -242,7 +242,7 @@ function TemplateForm({
                 {tool.available ? (
                   <span className="text-xs text-muted-foreground">included</span>
                 ) : (
-                  <span className="text-xs text-amber-700 dark:text-amber-400">
+                  <span className="text-xs text-warning">
                     needs the {tool.requires} connection — dropped
                   </span>
                 )}

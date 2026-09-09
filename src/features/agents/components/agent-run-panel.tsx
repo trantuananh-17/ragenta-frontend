@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, ImagePlus, Loader2, Play, Square, X } from "lucide-react";
+import { Check, ImagePlus, Play, Square, X } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ComposerAttachments } from "@/features/chat/components/chat-attachments";
 import { AnswerBody } from "@/features/chat/components/chat-message";
@@ -170,7 +171,7 @@ export function AgentRunPanel({
         <div className="space-y-3 rounded-lg border p-4">
           {pending && (
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" />
+              <Spinner className="size-3.5" />
               {streaming.phase === "retrieving"
                 ? "Searching the knowledge bases…"
                 : streaming.round
@@ -185,15 +186,15 @@ export function AgentRunPanel({
                 <li key={entry.key} className="space-y-0.5">
                   <div className="flex items-center gap-1.5">
                     {entry.ok === undefined ? (
-                      <Loader2 className="size-3 animate-spin text-muted-foreground" />
+                      <Spinner className="size-3 text-muted-foreground" />
                     ) : entry.ok ? (
-                      <Check className="size-3 text-emerald-600" />
+                      <Check className="size-3 text-success" />
                     ) : (
                       <X className="size-3 text-destructive" />
                     )}
                     <span className="font-medium">{entry.name}</span>
                     {entry.kind === "node" && (
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-xs text-muted-foreground">
                         {entry.detail}
                       </span>
                     )}
@@ -240,9 +241,9 @@ export function AgentRunPanel({
              * the wrong affordance for the decision being made.
              */
             awaiting.fields.length === 1 && awaiting.fields[0] === "approve" ? (
-              <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+              <div className="space-y-2 rounded-md border border-warning/40 bg-warning/5 p-3">
                 <p className="text-sm font-medium">Approval needed</p>
-                <pre className="max-h-40 overflow-auto rounded bg-background p-2 text-xs whitespace-pre-wrap">
+                <pre className="max-h-40 overflow-auto rounded-md bg-background p-2 text-xs whitespace-pre-wrap">
                   {awaiting.prompt}
                 </pre>
                 <div className="flex gap-2">

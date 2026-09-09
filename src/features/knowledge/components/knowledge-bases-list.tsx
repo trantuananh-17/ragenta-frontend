@@ -75,7 +75,7 @@ export function KnowledgeBasesScreen() {
                     {formatNumber(base.chunkCount)} chunks
                   </span>
                 </div>
-                <p className="mt-2 truncate text-[11px] text-muted-foreground">
+                <p className="mt-2 truncate text-xs text-muted-foreground">
                   {base.embeddingModel} · {base.embeddingDimensions}d ·{" "}
                   {base.chunkTokenSize} tokens / {base.chunkOverlapPercent}%
                 </p>

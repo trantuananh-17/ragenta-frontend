@@ -34,7 +34,7 @@ export function FlowNodeBox({ data, selected }: NodeProps) {
         "min-w-40 max-w-56 rounded-lg border bg-background px-3 py-2 shadow-sm transition-colors",
         selected && "border-primary ring-1 ring-primary/30",
         running && "border-primary bg-primary/5",
-        done && !running && "border-emerald-500/40",
+        done && !running && "border-success/40",
       )}
     >
       {nodeType !== "begin" && (
@@ -49,7 +49,7 @@ export function FlowNodeBox({ data, selected }: NodeProps) {
         />
         <span className="truncate text-xs font-medium">{label}</span>
       </div>
-      <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+      <p className="mt-0.5 truncate text-xs text-muted-foreground">
         {meta?.title ?? nodeType}
       </p>
 
@@ -59,7 +59,7 @@ export function FlowNodeBox({ data, selected }: NodeProps) {
         <div className="-mx-3 mt-1.5 space-y-1 border-t px-3 pt-1.5">
           {branches.map((branch) => (
             <div key={branch.handle} className="relative pr-2">
-              <span className="block truncate text-[10px] text-muted-foreground">
+              <span className="block truncate text-xs text-muted-foreground">
                 {branch.label}
               </span>
               <Handle

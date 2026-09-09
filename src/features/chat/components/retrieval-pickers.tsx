@@ -214,7 +214,7 @@ export function RetrievalSettingsPicker({
           <SlidersHorizontal className="size-3.5 text-muted-foreground" />
           {MODE_LABELS[mode].name}
           {topK !== null && (
-            <Badge variant="secondary" className="h-4 px-1 text-[10px] tabular-nums">
+            <Badge variant="secondary" className="h-4 px-1 text-xs tabular-nums">
               {topK}
             </Badge>
           )}

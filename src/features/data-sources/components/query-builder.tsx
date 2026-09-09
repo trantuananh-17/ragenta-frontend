@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Play, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -89,7 +90,8 @@ export function QueryBuilder({
             }
           >
             <Sparkles className="size-4" />
-            {propose.isPending ? "Writing..." : "Write it for me"}
+            {propose.isPending && <Spinner data-icon="inline-start" />}
+            Write it for me
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
@@ -193,7 +195,8 @@ export function QueryBuilder({
           }
         >
           <Play className="size-4" />
-          {run.isPending ? "Running..." : "Run it once"}
+          {run.isPending && <Spinner data-icon="inline-start" />}
+          Run it once
         </Button>
 
         <Button
@@ -216,7 +219,8 @@ export function QueryBuilder({
             )
           }
         >
-          {save.isPending ? "Saving..." : "Approve and save"}
+          {save.isPending && <Spinner data-icon="inline-start" />}
+          Approve and save
         </Button>
 
         <Button variant="ghost" onClick={onDone}>
@@ -237,7 +241,7 @@ export function QueryBuilder({
             {result.durationMs}ms{result.truncated ? " (more exist)" : ""}. This is what the agent
             will read.
           </p>
-          <div className="max-h-64 overflow-auto rounded border">
+          <div className="max-h-64 overflow-auto rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -264,7 +268,7 @@ export function QueryBuilder({
             </Table>
           </div>
           {result.rows.length === 0 && (
-            <p className="text-xs text-amber-700 dark:text-amber-400">
+            <p className="text-xs text-warning">
               It ran but matched nothing. That may be right, or the sample value may not exist —
               worth checking before approving.
             </p>

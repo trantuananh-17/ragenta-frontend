@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Database, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { AlertCircle, Database, Plus, RefreshCw, ShieldAlert, Trash2 } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DetailSection } from "@/components/detail-shell";
 import { StatusBadge } from "@/components/status-badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -124,7 +126,7 @@ export function DataSourcesScreen() {
                       {source.queries.map((query) => (
                         <li
                           key={query.id}
-                          className="flex flex-wrap items-start justify-between gap-2 rounded border px-3 py-2"
+                          className="flex flex-wrap items-start justify-between gap-2 rounded-md border px-3 py-2"
                         >
                           <div className="min-w-0">
                             <p className="flex items-center gap-2 font-mono text-xs">
@@ -141,7 +143,7 @@ export function DataSourcesScreen() {
                             <p className="mt-0.5 text-xs text-muted-foreground">
                               {query.description}
                             </p>
-                            <code className="mt-1 block overflow-x-auto text-[11px] text-muted-foreground/80">
+                            <code className="mt-1 block overflow-x-auto text-xs text-muted-foreground/80">
                               {query.sql}
                             </code>
                           </div>
@@ -288,7 +290,7 @@ export function DataSourcesPreview() {
                 {PREVIEW_QUERIES.map((query) => (
                   <li
                     key={query.name}
-                    className="flex flex-wrap items-start justify-between gap-2 rounded border px-3 py-2"
+                    className="flex flex-wrap items-start justify-between gap-2 rounded-md border px-3 py-2"
                   >
                     <div className="min-w-0">
                       <p className="flex items-center gap-2 font-mono text-xs">
@@ -298,7 +300,7 @@ export function DataSourcesPreview() {
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         {query.description}
                       </p>
-                      <code className="mt-1 block overflow-x-auto text-[11px] text-muted-foreground/80">
+                      <code className="mt-1 block overflow-x-auto text-xs text-muted-foreground/80">
                         {query.sql}
                       </code>
                     </div>
@@ -365,14 +367,15 @@ function ConnectForm({ onDone }: { onDone: () => void }) {
         </div>
       </div>
 
-      <div className="mt-3 rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-        <p className="font-medium">Use a read-only database user.</p>
-        <p className="mt-1 text-xs">
+      <Alert variant="warning" className="mt-3">
+        <ShieldAlert />
+        <AlertTitle>Use a read-only database user.</AlertTitle>
+        <AlertDescription>
           Every query runs in a read-only transaction, so your database refuses a write whatever the
           statement says. That is a second line — the one that holds is the grant on your side.
           Postgres and MySQL are supported; the type is read from the connection string.
-        </p>
-      </div>
+        </AlertDescription>
+      </Alert>
 
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="outline" onClick={onDone}>
@@ -387,7 +390,8 @@ function ConnectForm({ onDone }: { onDone: () => void }) {
             )
           }
         >
-          {save.isPending ? "Connecting..." : "Connect"}
+          {save.isPending && <Spinner data-icon="inline-start" />}
+          Connect
         </Button>
       </div>
     </DetailSection>

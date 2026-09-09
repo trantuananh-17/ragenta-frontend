@@ -42,7 +42,7 @@ function Availability({ model }: { model: CatalogueModel }) {
   if (model.selectable) {
     return (
       <span className="flex items-center gap-1 text-xs text-muted-foreground">
-        <Check className="size-3.5 text-emerald-600" />
+        <Check className="size-3.5 text-success" />
         available
       </span>
     );
@@ -50,7 +50,7 @@ function Availability({ model }: { model: CatalogueModel }) {
   if (!model.configured) {
     return (
       <span className="flex items-center gap-1 text-xs text-muted-foreground">
-        <AlertTriangle className="size-3.5 text-amber-500" />
+        <AlertTriangle className="size-3.5 text-warning" />
         no provider key
       </span>
     );
@@ -201,7 +201,7 @@ export function ModelSettingsScreen() {
                 <TableCell>
                   <Badge
                     variant={model.tier === "premium" ? "default" : "secondary"}
-                    className="text-[10px]"
+                    className="text-xs"
                   >
                     {model.tier}
                   </Badge>

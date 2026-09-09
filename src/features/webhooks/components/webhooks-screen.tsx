@@ -4,9 +4,11 @@ import { useState } from "react";
 import { AlertCircle, Plus, Send, Trash2 } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CopyButton } from "@/components/copy-button";
 import { DetailSection } from "@/components/detail-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -227,31 +229,18 @@ function SecretOnce({
   secret: string;
   onDismiss: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
-
   return (
-    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-4">
+    <div className="rounded-md border border-warning/40 bg-warning/10 p-4">
       <p className="text-sm font-medium">The signing secret for {name}</p>
       <p className="mt-1 text-xs text-muted-foreground">
         Copy it into your receiver now. It is stored encrypted and never shown again —
         if it is lost, issue a new one, which stops the old one working.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <code className="min-w-0 flex-1 overflow-x-auto rounded bg-background px-2 py-1.5 font-mono text-xs">
+        <code className="min-w-0 flex-1 overflow-x-auto rounded-sm bg-background px-2 py-1.5 font-mono text-xs">
           {secret}
         </code>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            void navigator.clipboard.writeText(secret).then(() => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1_500);
-            });
-          }}
-        >
-          {copied ? "Copied" : "Copy"}
-        </Button>
+        <CopyButton value={secret} label="Copy" />
         <Button size="sm" onClick={onDismiss}>
           I have it
         </Button>
@@ -370,7 +359,7 @@ function EndpointForm({
                 <span className="block text-xs text-muted-foreground">
                   {event.summary}
                 </span>
-                <span className="block text-[11px] text-muted-foreground/80">
+                <span className="block text-xs text-muted-foreground/80">
                   Carries {event.fields.join(", ")}
                 </span>
               </span>
@@ -398,7 +387,8 @@ function EndpointForm({
             Cancel
           </Button>
           <Button disabled={!ready || pending} onClick={submit}>
-            {pending ? "Saving..." : endpoint ? "Save" : "Add endpoint"}
+            {pending && <Spinner data-icon="inline-start" />}
+            {endpoint ? "Save" : "Add endpoint"}
           </Button>
         </div>
       </div>

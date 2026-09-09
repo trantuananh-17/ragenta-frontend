@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Dialog,
   DialogContent,
@@ -237,7 +238,8 @@ export function KnowledgeBaseSettingsDialog({
             Cancel
           </Button>
           <Button type="button" onClick={submit} disabled={update.isPending}>
-            {update.isPending ? "Saving..." : "Save"}
+            {update.isPending && <Spinner data-icon="inline-start" />}
+            Save
           </Button>
         </DialogFooter>
       </DialogContent>

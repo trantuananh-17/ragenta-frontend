@@ -18,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Spinner } from "@/components/ui/spinner";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { useLogout } from "@/features/auth/hooks/auth.hook";
 import { useBillingSummary } from "@/features/billing/hooks/billing.hook";
@@ -101,8 +102,12 @@ export function NavUser({
           disabled={logout.isPending}
           onSelect={() => logout.mutate()}
         >
-          <LogOut className="size-4" />
-          {logout.isPending ? "Signing out..." : "Sign out"}
+          {logout.isPending ? (
+            <Spinner className="size-4" />
+          ) : (
+            <LogOut className="size-4" />
+          )}
+          Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

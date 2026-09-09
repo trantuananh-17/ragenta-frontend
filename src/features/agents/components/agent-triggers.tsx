@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Clock, Plus, Trash2, Webhook } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CopyButton } from "@/components/copy-button";
 import { DetailSection } from "@/components/detail-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -263,27 +264,15 @@ export function AgentTriggers({
 
 /** The URL a caller POSTs to, with the copy button next to it. */
 function WebhookAddress({ trigger }: { trigger: Trigger }) {
-  const [copied, setCopied] = useState(false);
   const url = webhookUrl(trigger.id);
 
   return (
     <div className="space-y-1">
       <div className="flex flex-wrap items-center gap-2">
-        <code className="overflow-x-auto rounded bg-muted px-2 py-1 font-mono text-xs">
+        <code className="overflow-x-auto rounded-sm bg-muted px-2 py-1 font-mono text-xs">
           POST {url}
         </code>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            void navigator.clipboard.writeText(url).then(() => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1_500);
-            });
-          }}
-        >
-          {copied ? "Copied" : "Copy"}
-        </Button>
+        <CopyButton value={url} label="Copy" />
       </div>
       <p className="text-xs text-muted-foreground">
         With the secret in an <code className="font-mono">X-Ragenta-Secret</code>{" "}
@@ -311,31 +300,18 @@ function SecretOnce({
   secret: string;
   onDismiss: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
-
   return (
-    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-4">
+    <div className="rounded-md border border-warning/40 bg-warning/10 p-4">
       <p className="text-sm font-medium">The secret for {name}</p>
       <p className="mt-1 text-xs text-muted-foreground">
         Copy it now. It is stored hashed, so this is the only time it can be shown —
         if it is lost, remove the webhook and add another.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <code className="min-w-0 flex-1 overflow-x-auto rounded bg-background px-2 py-1.5 font-mono text-xs">
+        <code className="min-w-0 flex-1 overflow-x-auto rounded-sm bg-background px-2 py-1.5 font-mono text-xs">
           {secret}
         </code>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            void navigator.clipboard.writeText(secret).then(() => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1_500);
-            });
-          }}
-        >
-          {copied ? "Copied" : "Copy"}
-        </Button>
+        <CopyButton value={secret} label="Copy" />
         <Button size="sm" onClick={onDismiss}>
           I have it
         </Button>

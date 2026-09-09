@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertCircle, KeyRound, Link2, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, CircleCheck, KeyRound, Link2, Plus, Trash2 } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CopyButton } from "@/components/copy-button";
 import { DetailSection } from "@/components/detail-shell";
 import { PlanGate } from "@/components/plan-gate";
 import { StatusBadge } from "@/components/status-badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,14 +57,16 @@ export function ConnectionsScreen() {
   return (
     <div className="space-y-6">
       {connected && (
-        <p className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-400">
-          {connected} connected.
-        </p>
+        <Alert variant="success">
+          <CircleCheck />
+          <AlertDescription>{connected} connected.</AlertDescription>
+        </Alert>
       )}
       {failed && (
-        <p className="rounded-md border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {failed}
-        </p>
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertDescription>{failed}</AlertDescription>
+        </Alert>
       )}
 
       <DetailSection
@@ -322,7 +327,6 @@ function CreateKeyForm({ mine, onDone }: { mine: string[]; onDone: () => void })
   const [name, setName] = useState("");
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [secret, setSecret] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   /**
    * Only what the creator holds. The backend refuses anything else by name, and
@@ -338,21 +342,10 @@ function CreateKeyForm({ mine, onDone }: { mine: string[]; onDone: () => void })
         description="It is stored hashed, so this is the only time it can be shown. Closing this loses it — create another if that happens."
       >
         <div className="flex items-center gap-2">
-          <code className="min-w-0 flex-1 overflow-x-auto rounded bg-muted px-2 py-1.5 font-mono text-xs">
+          <code className="min-w-0 flex-1 overflow-x-auto rounded-sm bg-muted px-2 py-1.5 font-mono text-xs">
             {secret}
           </code>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              void navigator.clipboard.writeText(secret).then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1_500);
-              });
-            }}
-          >
-            {copied ? "Copied" : "Copy"}
-          </Button>
+          <CopyButton value={secret} label="Copy" />
         </div>
         <Button className="mt-4" size="sm" onClick={onDone}>
           Done
@@ -378,11 +371,11 @@ function CreateKeyForm({ mine, onDone }: { mine: string[]; onDone: () => void })
 
       <div className="mt-4 space-y-2">
         <Label>What it may do</Label>
-        <div className="grid max-h-64 gap-1 overflow-auto rounded border p-2 md:grid-cols-2">
+        <div className="grid max-h-64 gap-1 overflow-auto rounded-md border p-2 md:grid-cols-2">
           {offerable.map((permission) => (
             <label
               key={permission}
-              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-muted/60"
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 hover:bg-muted/60"
             >
               <Checkbox
                 checked={chosen.has(permission)}
@@ -418,7 +411,8 @@ function CreateKeyForm({ mine, onDone }: { mine: string[]; onDone: () => void })
             )
           }
         >
-          {create.isPending ? "Creating..." : "Create"}
+          {create.isPending && <Spinner data-icon="inline-start" />}
+          Create
         </Button>
       </div>
     </DetailSection>

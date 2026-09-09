@@ -8,6 +8,49 @@
  * shadcn/ui token set, with the accent family swapped to Ragenta's violet — the
  * same brand ramp `ragenta-landing-page` uses (#8b5cf6 / #7c3aed), so the admin
  * console and the marketing site read as one product.
+ *
+ * This file is mirrored byte-for-byte in `ragenta-admin-frontend`. A colour,
+ * radius or type decision made here is made for both consoles; change them
+ * together or they drift.
+ *
+ * ── Colour ────────────────────────────────────────────────────────────────
+ * Every colour is a token. No raw Tailwind palette class (`text-emerald-600`)
+ * in application code — a palette class cannot follow the theme, which is why
+ * each one used to drag a `dark:` override behind it.
+ *
+ * `success` / `warning` / `info` join `destructive` as status tokens. Each is
+ * defined at the lightness that reads as *text* in its own theme, so the one
+ * token serves all three jobs and needs no dark-mode counterpart:
+ *     text-success   bg-success/10   border-success/25
+ *
+ * `chart-1..5` are five distinct hues anchored on the brand violet. They were
+ * five shades of one violet, which is no encoding at all once a chart has more
+ * than one series.
+ *
+ * ── Radius ────────────────────────────────────────────────────────────────
+ * Derived from `--radius`; pick by what the thing *is*, never by eye:
+ *     rounded-lg    surfaces — cards, panels, sections, dialogs
+ *     rounded-md    controls — inputs, buttons, menu items, table frames
+ *     rounded-sm    inline chips, code spans, swatches
+ *     rounded-full  avatars, status dots, and genuine pills only
+ * Bare `rounded` is not part of the scale; it is Tailwind's 4px default and
+ * matches nothing else on screen.
+ *
+ * ── Type ──────────────────────────────────────────────────────────────────
+ *     text-2xl font-semibold tracking-tight   page title (one per screen)
+ *     text-base / text-lg font-semibold       section heading
+ *     text-sm                                 body, table cells, controls
+ *     text-sm text-muted-foreground           supporting copy
+ *     text-xs text-muted-foreground           metadata, timestamps, hints
+ * `text-xs` (12px) is the floor. Arbitrary sizes below it — `text-[11px]`,
+ * `text-[10px]` — are not a scale step and are not legible at a glance.
+ *
+ * ── Spacing ───────────────────────────────────────────────────────────────
+ * Flex/grid `gap-*`, not `space-y-*`, so the gap belongs to the container:
+ *     gap-1 / gap-2     tightly bound (label + badge, icon + text)
+ *     gap-3 / gap-4     related controls, form fields, grid cells
+ *     gap-6             component groups within a section
+ *     gap-8 / gap-12    page sections
  */
 @theme inline {
   --color-background: var(--background);
@@ -31,6 +74,9 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -67,14 +113,17 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  --success: oklch(0.5 0.115 163);
+  --warning: oklch(0.499 0.126 65);
+  --info: oklch(0.5 0.118 245);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.6056 0.2189 292.72);
   --chart-1: oklch(0.6056 0.2189 292.72);
-  --chart-2: oklch(0.7093 0.1589 293.54);
-  --chart-3: oklch(0.4907 0.2412 292.58);
-  --chart-4: oklch(0.8113 0.1013 293.57);
-  --chart-5: oklch(0.4318 0.2079 292.75);
+  --chart-2: oklch(0.6 0.118 184);
+  --chart-3: oklch(0.62 0.155 45);
+  --chart-4: oklch(0.55 0.16 330);
+  --chart-5: oklch(0.58 0.13 230);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -102,14 +151,17 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.796 0.162 162);
+  --warning: oklch(0.879 0.153 92);
+  --info: oklch(0.828 0.101 230);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.7093 0.1589 293.54);
   --chart-1: oklch(0.7093 0.1589 293.54);
-  --chart-2: oklch(0.6056 0.2189 292.72);
-  --chart-3: oklch(0.8113 0.1013 293.57);
-  --chart-4: oklch(0.4907 0.2412 292.58);
-  --chart-5: oklch(0.8942 0.0578 293.28);
+  --chart-2: oklch(0.7 0.12 184);
+  --chart-3: oklch(0.73 0.15 60);
+  --chart-4: oklch(0.68 0.16 330);
+  --chart-5: oklch(0.7 0.12 230);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.6056 0.2189 292.72);

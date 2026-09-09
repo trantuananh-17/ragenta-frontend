@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { CircleStop, Download, RefreshCw } from "lucide-react";
+import { AlertCircle, CircleStop, Download, RefreshCw } from "lucide-react";
 
 import { DetailShell, DetailList, DetailSection } from "@/components/detail-shell";
 import { EntityPagination } from "@/components/entity-components";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
@@ -113,9 +114,11 @@ export function DocumentDetail({
       />
 
       {document.data.status === "failed" && document.data.error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-          {document.data.error}
-        </div>
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertTitle>This document could not be indexed</AlertTitle>
+          <AlertDescription>{document.data.error}</AlertDescription>
+        </Alert>
       )}
 
       <DocumentProgress
@@ -171,7 +174,7 @@ export function DocumentDetail({
                 className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm"
               >
                 <div className="flex min-w-0 items-center gap-2">
-                  <Badge variant="secondary" className="h-5 shrink-0 text-[11px]">
+                  <Badge variant="secondary" className="h-5 shrink-0 text-xs">
                     {task.fromPage === null
                       ? "whole file"
                       : `pages ${task.fromPage}–${task.toPage}`}
@@ -184,7 +187,7 @@ export function DocumentDetail({
                   <span>{formatNumber(task.chunkCount)} chunks</span>
                   <Badge
                     variant={task.status === "failed" ? "destructive" : "outline"}
-                    className="h-5 text-[11px]"
+                    className="h-5 text-xs"
                   >
                     {task.status}
                   </Badge>
@@ -209,11 +212,11 @@ export function DocumentDetail({
             {chunks.data.items.map((chunk) => (
               <div key={chunk.id} className="rounded-md border p-3">
                 <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground tabular-nums">
-                  <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                  <Badge variant="secondary" className="h-4 px-1.5 text-xs">
                     #{chunk.ordinal + 1}
                   </Badge>
                   {chunk.kind !== "passage" && (
-                    <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
+                    <Badge variant="outline" className="h-4 px-1.5 text-xs">
                       {chunk.kind}
                     </Badge>
                   )}

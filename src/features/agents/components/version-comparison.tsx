@@ -6,6 +6,7 @@ import { Play } from "lucide-react";
 import { DetailSection } from "@/components/detail-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -123,8 +124,12 @@ export function VersionComparison({
             )
           }
         >
-          <Play className="size-4" />
-          {start.isPending ? "Starting..." : `Run it on ${chosen.length} versions`}
+          {start.isPending ? (
+            <Spinner data-icon="inline-start" />
+          ) : (
+            <Play data-icon="inline-start" />
+          )}
+          {`Run it on ${chosen.length} versions`}
         </Button>
       </div>
 

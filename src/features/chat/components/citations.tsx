@@ -47,7 +47,7 @@ function citationLocation(citation: Citation): string | null {
 function SummaryNote({ kind }: { kind?: string }) {
   if (kind !== "summary") return null;
   return (
-    <p className="text-[10px] text-muted-foreground">
+    <p className="text-xs text-muted-foreground">
       Model-written summary of several passages, not a quotation.
     </p>
   );
@@ -63,7 +63,7 @@ function CitationBadge({ citation }: { citation: Citation }) {
         >
           <Badge
             variant="secondary"
-            className="h-4 rounded-full px-1.5 text-[10px] font-medium tabular-nums"
+            className="h-4 rounded-full px-1.5 text-xs font-medium tabular-nums"
           >
             {citation.index}
           </Badge>
@@ -78,7 +78,7 @@ function CitationBadge({ citation }: { citation: Citation }) {
           {citation.snippet}
         </p>
         <SummaryNote kind={citation.kind} />
-        <p className="text-[10px] text-muted-foreground tabular-nums">
+        <p className="text-xs text-muted-foreground tabular-nums">
           relevance {citation.score.toFixed(2)}
           {citationLocation(citation) && (
             <span className="ml-1">· {citationLocation(citation)}</span>
@@ -184,7 +184,7 @@ export function SourceList({ citations }: { citations: Citation[] }) {
             <p className="flex items-center gap-1.5 font-medium">
               <Badge
                 variant="secondary"
-                className="h-4 rounded-full px-1.5 text-[10px] tabular-nums"
+                className="h-4 rounded-full px-1.5 text-xs tabular-nums"
               >
                 {citation.index}
               </Badge>

@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { buttonVariants } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
 interface ConfirmDialogProps {
@@ -63,7 +64,8 @@ export function ConfirmDialog({
                 buttonVariants({ variant: "destructive" }),
             )}
           >
-            {pending ? "Working..." : confirmLabel}
+            {pending && <Spinner data-icon="inline-start" />}
+            {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

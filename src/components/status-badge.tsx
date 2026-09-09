@@ -3,20 +3,22 @@ import { cn } from "@/lib/utils";
 
 type Tone = "neutral" | "success" | "warning" | "danger" | "info";
 
-const toneClass: Record<Tone, string> = {
-  neutral: "bg-muted text-muted-foreground border-transparent",
-  success:
-    "bg-emerald-500/10 text-emerald-700 border-emerald-500/25 dark:text-emerald-400",
-  warning:
-    "bg-amber-500/10 text-amber-700 border-amber-500/25 dark:text-amber-400",
-  danger: "bg-red-500/10 text-red-700 border-red-500/25 dark:text-red-400",
-  info: "bg-sky-500/10 text-sky-700 border-sky-500/25 dark:text-sky-400",
-};
-
 /**
  * One badge vocabulary across every screen: published is green wherever it
  * appears, a suspended account and a failed charge share the same red.
+ *
+ * Each tone is one status token used three ways — the text, a 10% wash behind
+ * it, a 25% edge. The token is already defined at the right lightness for its
+ * own theme, so none of these needs a `dark:` counterpart.
  */
+const toneClass: Record<Tone, string> = {
+  neutral: "border-transparent bg-muted text-muted-foreground",
+  success: "border-success/25 bg-success/10 text-success",
+  warning: "border-warning/25 bg-warning/10 text-warning",
+  danger: "border-destructive/25 bg-destructive/10 text-destructive",
+  info: "border-info/25 bg-info/10 text-info",
+};
+
 export function StatusBadge({
   tone = "neutral",
   children,

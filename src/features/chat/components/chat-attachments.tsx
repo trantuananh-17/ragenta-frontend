@@ -165,7 +165,7 @@ export function ComposerAttachments({
                   <AlertTriangle className="size-4 text-destructive" />
                 )}
               </div>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 {item.status === "failed"
                   ? (item.error ?? "This recording could not be uploaded.")
                   : "Voice note — sent with its transcript"}

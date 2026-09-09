@@ -3,14 +3,16 @@
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
-import { Mail, Trash2, UserPlus } from "lucide-react";
+import { Mail, TriangleAlert, Trash2, UserPlus } from "lucide-react";
 import { z } from "zod";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DetailSection } from "@/components/detail-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -106,10 +108,13 @@ export function MembersScreen() {
         }
       >
         {seatsFull && (
-          <p className="mb-4 rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-            Every seat on the {overview.data.billing.plan} plan is taken. Upgrade
-            the plan, or remove a member, before inviting anyone else.
-          </p>
+          <Alert variant="warning" className="mb-4">
+            <TriangleAlert />
+            <AlertDescription>
+              Every seat on the {overview.data.billing.plan} plan is taken.
+              Upgrade the plan, or remove a member, before inviting anyone else.
+            </AlertDescription>
+          </Alert>
         )}
 
         <form
@@ -156,7 +161,8 @@ export function MembersScreen() {
 
           <Button type="submit" disabled={!mayAdminister || invite.isPending}>
             <UserPlus className="size-4" />
-            {invite.isPending ? "Sending..." : "Invite"}
+            {invite.isPending && <Spinner data-icon="inline-start" />}
+            Invite
           </Button>
         </form>
 
@@ -171,8 +177,8 @@ export function MembersScreen() {
             <TableRow>
               <TableHead>Person</TableHead>
               <TableHead>Role</TableHead>
-              <TableHead>Extra roles</TableHead>
-              <TableHead>Joined</TableHead>
+              <TableHead className="hidden md:table-cell">Extra roles</TableHead>
+              <TableHead className="hidden lg:table-cell">Joined</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -224,7 +230,7 @@ export function MembersScreen() {
                     </Select>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell className="hidden md:table-cell">
                   <MemberRolesCell
                     workspaceId={workspace.id}
                     memberId={member.id}
@@ -232,7 +238,7 @@ export function MembersScreen() {
                     disabled={!mayAdminister}
                   />
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
+                <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
                   {formatDate(member.createdAt)}
                 </TableCell>
                 <TableCell>

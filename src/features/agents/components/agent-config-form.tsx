@@ -324,7 +324,7 @@ export function AgentConfigForm({
               <span>
                 <span className="font-medium">{tool.title}</span>
                 {tool.writes && (
-                  <span className="ml-1.5 rounded bg-amber-500/10 px-1 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                  <span className="ml-1.5 rounded-sm bg-warning/10 px-1 py-0.5 text-xs font-medium text-warning">
                     changes things
                   </span>
                 )}
@@ -332,7 +332,7 @@ export function AgentConfigForm({
                   {tool.description}
                 </span>
                 {tool.requires && (
-                  <span className="block text-[11px] text-muted-foreground">
+                  <span className="block text-xs text-muted-foreground">
                     Needs the <code>{tool.requires}</code> connection configured by an
                     administrator.
                   </span>
@@ -353,7 +353,7 @@ export function AgentConfigForm({
       </div>
 
       {picksWritingTool && (
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-warning/40 bg-warning/5 p-3">
           <div className="space-y-0.5">
             <Label htmlFor="approveWrites">Ask before it changes anything</Label>
             <p className="text-xs text-muted-foreground">

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { DetailSection } from "@/components/detail-shell";
 import { StatCard, StatCardGrid } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -63,7 +64,8 @@ export function WorkspaceSettings() {
             disabled={!mayEdit || update.isPending || name.trim().length < 2}
             onClick={() => update.mutate({ name: name.trim() })}
           >
-            {update.isPending ? "Saving..." : "Save"}
+            {update.isPending && <Spinner data-icon="inline-start" />}
+              Save
           </Button>
         }
       >

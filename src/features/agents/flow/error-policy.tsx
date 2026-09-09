@@ -52,7 +52,7 @@ export function ErrorPolicyFields({
       </div>
 
       {policy === null ? (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           The run stops and the failure is reported. Turn this on to retry, to carry
           on with a stand-in answer, or to take a different route.
         </p>
@@ -92,7 +92,7 @@ export function ErrorPolicyFields({
                 })
               }
             />
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Used as this step&apos;s answer so the flow continues as if it had
               worked.
             </p>
@@ -102,7 +102,7 @@ export function ErrorPolicyFields({
             <Label className="text-xs">Or go to</Label>
             <div className="space-y-1.5 rounded-md border p-2">
               {targets.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   There is no other step to go to yet.
                 </p>
               ) : (
@@ -128,7 +128,7 @@ export function ErrorPolicyFields({
                 ))
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Taken instead of this step&apos;s usual next steps — but only when there
               is no stand-in answer above, which is used first.
             </p>

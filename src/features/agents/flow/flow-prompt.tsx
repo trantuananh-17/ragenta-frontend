@@ -5,6 +5,7 @@ import { AlertCircle, Sparkles } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useGenerateGraph } from "@/features/agents/hooks/agents.hook";
@@ -83,7 +84,8 @@ export function FlowPrompt({
         disabled={disabled || generate.isPending || prompt.trim().length < 10}
         onClick={run}
       >
-        {generate.isPending ? "Drafting..." : "Draft the flow"}
+        {generate.isPending && <Spinner data-icon="inline-start" />}
+        Draft the flow
       </Button>
 
       {errors.length > 0 && (
@@ -92,7 +94,7 @@ export function FlowPrompt({
             <AlertCircle className="size-3.5" />
             The draft was refused
           </p>
-          <ul className="space-y-0.5 text-[11px] text-muted-foreground">
+          <ul className="space-y-0.5 text-xs text-muted-foreground">
             {errors.map((error) => (
               <li key={error}>{error}</li>
             ))}
@@ -100,7 +102,7 @@ export function FlowPrompt({
         </div>
       )}
 
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         A draft lands on the canvas for you to correct. Nothing is saved until you
         publish a version.
       </p>

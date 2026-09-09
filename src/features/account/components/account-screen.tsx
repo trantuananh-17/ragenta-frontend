@@ -9,6 +9,7 @@ import { DetailShell, DetailSection } from "@/components/detail-shell";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
@@ -64,7 +65,8 @@ export function AccountScreen({ user }: { user: SessionUser }) {
             disabled={updateProfile.isPending || name.trim().length < 2}
             onClick={() => updateProfile.mutate({ name: name.trim() })}
           >
-            {updateProfile.isPending ? "Saving..." : "Save"}
+            {updateProfile.isPending && <Spinner data-icon="inline-start" />}
+            Save
           </Button>
         }
       >
@@ -147,7 +149,8 @@ export function AccountScreen({ user }: { user: SessionUser }) {
             )}
           </div>
           <Button type="submit" disabled={changePassword.isPending}>
-            {changePassword.isPending ? "Changing..." : "Change password"}
+            {changePassword.isPending && <Spinner data-icon="inline-start" />}
+            Change password
           </Button>
         </form>
       </DetailSection>

@@ -7,16 +7,16 @@ import {
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
+  type RowData,
 } from "@tanstack/react-table";
 import { InboxIcon, PlusIcon, SearchIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/page-header";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardTitle,
-} from "@/components/ui/card";
+  CONTENT_WIDTHS,
+  type ContentWidth,
+} from "@/components/detail-shell";
+import { Button } from "@/components/ui/button";
 import {
   Empty,
   EmptyContent,
@@ -25,7 +25,12 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -36,6 +41,30 @@ import {
 } from "@/components/ui/table";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
+
+declare module "@tanstack/react-table" {
+  // Both parameters go unused here, but they are part of `ColumnMeta`'s own
+  // signature and declaration merging requires the identical list.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    /**
+     * How hard this column fights for horizontal room.
+     *
+     * A table that only scrolls sideways on a phone hides its own columns
+     * behind a gesture nobody performs. Naming the ones that can wait lets the
+     * narrow layout drop them instead: `secondary` comes back at `md`,
+     * `tertiary` at `lg`. Leave it unset on the columns that identify the row
+     * and on the actions — those never drop.
+     */
+    priority?: "secondary" | "tertiary";
+  }
+}
+
+/** Where a column of each priority starts being rendered. */
+const COLUMN_PRIORITY = {
+  secondary: "hidden md:table-cell",
+  tertiary: "hidden lg:table-cell",
+} as const;
 
 /**
  * The scaffolding every list screen is built from. A feature supplies its
@@ -55,6 +84,13 @@ type EntityHeaderProps = {
   | { onNew?: never; newButtonHref?: never }
 );
 
+/**
+ * A list screen's title, which is `PageHeader` plus the New button.
+ *
+ * It delegates rather than laying the title out itself: a list page and the
+ * detail page it links to are the same rank, and rendering them through two
+ * components is how they ended up at two heading sizes.
+ */
 export function EntityHeader({
   title,
   description,
@@ -65,33 +101,29 @@ export function EntityHeader({
   actions,
 }: EntityHeaderProps) {
   return (
-    <div className="flex flex-row items-center justify-between gap-x-4">
-      <div className="flex flex-col">
-        <h1 className="text-lg font-semibold md:text-xl">{title}</h1>
-        {description && (
-          <p className="text-xs text-muted-foreground md:text-sm">
-            {description}
-          </p>
-        )}
-      </div>
-      <div className="flex items-center gap-2">
-        {actions}
-        {onNew && (
-          <Button size="sm" disabled={disabled} onClick={onNew}>
-            <PlusIcon className="size-4" />
-            {newButtonLabel}
-          </Button>
-        )}
-        {newButtonHref && (
-          <Button size="sm" asChild>
-            <Link href={newButtonHref} prefetch>
-              <PlusIcon className="size-4" />
+    <PageHeader
+      title={title}
+      description={description}
+      actions={
+        <>
+          {actions}
+          {onNew && (
+            <Button size="sm" disabled={disabled} onClick={onNew}>
+              <PlusIcon data-icon="inline-start" />
               {newButtonLabel}
-            </Link>
-          </Button>
-        )}
-      </div>
-    </div>
+            </Button>
+          )}
+          {newButtonHref && (
+            <Button size="sm" asChild>
+              <Link href={newButtonHref} prefetch>
+                <PlusIcon data-icon="inline-start" />
+                {newButtonLabel}
+              </Link>
+            </Button>
+          )}
+        </>
+      }
+    />
   );
 }
 
@@ -102,6 +134,8 @@ interface EntityContainerProps {
   /** Result counts or bulk actions — below the filters, outside the scroll area. */
   actions?: React.ReactNode;
   pagination?: React.ReactNode;
+  /** Shares `DetailShell`'s scale, so a list and its detail page line up. */
+  width?: ContentWidth;
   children: React.ReactNode;
 }
 
@@ -111,18 +145,26 @@ export function EntityContainer({
   search,
   actions,
   pagination,
+  width = "wide",
   children,
 }: EntityContainerProps) {
   return (
-    <div className="flex h-full flex-col gap-y-6 p-4 md:px-10 md:py-6">
-      {header && <div className="shrink-0">{header}</div>}
-      {stats && <div className="shrink-0">{stats}</div>}
-      {search && <div className="shrink-0">{search}</div>}
-      {actions && <div className="shrink-0">{actions}</div>}
-      <div className="flex min-h-0 flex-1 flex-col overflow-auto rounded-md border bg-background">
-        {children}
+    <div className="flex h-full flex-col p-4 md:px-10 md:py-6">
+      <div
+        className={cn(
+          "mx-auto flex min-h-0 w-full flex-1 flex-col gap-6",
+          CONTENT_WIDTHS[width],
+        )}
+      >
+        {header && <div className="shrink-0">{header}</div>}
+        {stats && <div className="shrink-0">{stats}</div>}
+        {search && <div className="shrink-0">{search}</div>}
+        {actions && <div className="shrink-0">{actions}</div>}
+        <div className="flex min-h-0 flex-1 flex-col overflow-auto rounded-md border bg-background">
+          {children}
+        </div>
+        {pagination && <div className="shrink-0">{pagination}</div>}
       </div>
-      {pagination && <div className="shrink-0">{pagination}</div>}
     </div>
   );
 }
@@ -161,15 +203,18 @@ export function EntitySearch({
   }, [debouncedValue]);
 
   return (
-    <div className={cn("relative w-full", className)}>
-      <SearchIcon className="absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        className="w-full border-border bg-background pl-8 shadow-none"
+    <InputGroup className={cn("w-full bg-background", className)}>
+      <InputGroupAddon>
+        <SearchIcon />
+      </InputGroupAddon>
+      <InputGroupInput
+        type="search"
+        aria-label={placeholder}
         placeholder={placeholder}
         value={localValue}
         onChange={(event) => setLocalValue(event.target.value)}
       />
-    </div>
+    </InputGroup>
   );
 }
 
@@ -270,79 +315,6 @@ export function EntityEmptyView({
   );
 }
 
-interface EntityListProps<T> {
-  items: T[];
-  renderItem: (item: T, index: number) => React.ReactNode;
-  getKey?: (item: T, index: number) => string | number;
-  emptyView?: React.ReactNode;
-  className?: string;
-}
-
-export function EntityList<T>({
-  items,
-  renderItem,
-  getKey,
-  emptyView,
-  className,
-}: EntityListProps<T>) {
-  if (items.length === 0 && emptyView) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="mx-auto max-w-sm">{emptyView}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={cn("flex flex-col gap-y-4", className)}>
-      {items.map((item, index) => (
-        <div key={getKey ? getKey(item, index) : index}>
-          {renderItem(item, index)}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-interface EntityItemProps {
-  href: string;
-  title: string;
-  subtitle?: React.ReactNode;
-  image?: React.ReactNode;
-  actions?: React.ReactNode;
-  className?: string;
-}
-
-export function EntityItem({
-  href,
-  title,
-  subtitle,
-  image,
-  actions,
-  className,
-}: EntityItemProps) {
-  return (
-    <Link href={href} prefetch>
-      <Card
-        className={cn("cursor-pointer p-4 shadow-none hover:shadow", className)}
-      >
-        <CardContent className="flex flex-row items-center justify-between p-0">
-          <div className="flex items-center gap-3">
-            {image}
-            <div>
-              <CardTitle className="text-base font-medium">{title}</CardTitle>
-              {subtitle && (
-                <CardDescription className="text-xs">{subtitle}</CardDescription>
-              )}
-            </div>
-          </div>
-          {actions && <div className="flex items-center gap-x-4">{actions}</div>}
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
-
 interface EntityDataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
@@ -385,16 +357,22 @@ export function EntityDataTable<TData, TValue>({
       >
         {table.getHeaderGroups().map((headerGroup) => (
           <TableRow key={headerGroup.id}>
-            {headerGroup.headers.map((header) => (
-              <TableHead key={header.id}>
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(
-                      header.column.columnDef.header,
-                      header.getContext(),
-                    )}
-              </TableHead>
-            ))}
+            {headerGroup.headers.map((header) => {
+              const priority = header.column.columnDef.meta?.priority;
+              return (
+                <TableHead
+                  key={header.id}
+                  className={priority && COLUMN_PRIORITY[priority]}
+                >
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
+                </TableHead>
+              );
+            })}
           </TableRow>
         ))}
       </TableHeader>
@@ -405,9 +383,62 @@ export function EntityDataTable<TData, TValue>({
             onClick={onRowClick ? () => onRowClick(row.original) : undefined}
             className={onRowClick ? "cursor-pointer hover:bg-muted/50" : undefined}
           >
-            {row.getVisibleCells().map((cell) => (
-              <TableCell key={cell.id}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            {row.getVisibleCells().map((cell) => {
+              const priority = cell.column.columnDef.meta?.priority;
+              return (
+                <TableCell
+                  key={cell.id}
+                  className={priority && COLUMN_PRIORITY[priority]}
+                >
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              );
+            })}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+/**
+ * A list's loading state, shaped like the table that replaces it.
+ *
+ * A centred spinner tells you only that something is happening, then reflows
+ * the whole page when the rows land. Rows of the right height in the right
+ * number of columns hold the layout still, so the resolved table appears in
+ * place rather than pushing everything down.
+ */
+export function EntityTableSkeleton({
+  columns,
+  rows = 8,
+}: {
+  columns: number;
+  rows?: number;
+}) {
+  // Mirrors what the resolved table will drop at each width, so the skeleton
+  // does not show six columns on a phone that is about to render two.
+  const columnClass = (column: number) =>
+    column < 2 ? undefined : column < 4 ? COLUMN_PRIORITY.secondary : COLUMN_PRIORITY.tertiary;
+
+  return (
+    <Table aria-busy>
+      <TableHeader>
+        <TableRow>
+          {Array.from({ length: columns }).map((_, column) => (
+            <TableHead key={column} className={columnClass(column)}>
+              <Skeleton className="h-3.5 w-20" />
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {Array.from({ length: rows }).map((_, row) => (
+          <TableRow key={row}>
+            {Array.from({ length: columns }).map((_, column) => (
+              <TableCell key={column} className={columnClass(column)}>
+                {/* The first column carries the name, so it is the wide one. */}
+                <Skeleton className={cn("h-4", column === 0 ? "w-40" : "w-24")} />
               </TableCell>
             ))}
           </TableRow>

@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Card,
   CardContent,
@@ -97,7 +98,8 @@ export function CreateWorkspaceCard({
           </div>
 
           <Button type="submit" disabled={create.isPending}>
-            {create.isPending ? "Creating..." : "Create workspace"}
+            {create.isPending && <Spinner data-icon="inline-start" />}
+            Create workspace
           </Button>
 
           {existing.length > 0 && (
