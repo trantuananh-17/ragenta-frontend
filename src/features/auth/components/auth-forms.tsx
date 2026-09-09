@@ -17,9 +17,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  EmailNotVerifiedError,
   useGoogleSignIn,
   useLogin,
   useRequestPasswordReset,
+  useResendVerificationEmail,
   useResetPassword,
   useSignUp,
 } from "../hooks/auth.hook";
@@ -52,8 +54,15 @@ const loginSchema = z.object({
 export function LoginForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect");
+  // A verification link that no longer works comes back here carrying `error`;
+  // a working one signs the account in and never reaches this form.
+  const verificationLinkFailed = searchParams.has("error");
   const login = useLogin(redirectTo);
   const googleSignIn = useGoogleSignIn(redirectTo);
+  const resendVerification = useResendVerificationEmail();
+
+  const unverified =
+    login.error instanceof EmailNotVerifiedError ? login.error : null;
 
   const {
     register,
@@ -73,6 +82,34 @@ export function LoginForm() {
         <CardDescription>Sign in to your Ragenta workspace</CardDescription>
       </CardHeader>
       <CardContent>
+        {verificationLinkFailed && !unverified && (
+          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            That verification link did not work — it may have expired or been
+            used already. Sign in below and we will offer you a new one.
+          </div>
+        )}
+
+        {unverified && (
+          <div className="mb-4 grid gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <p>
+              Confirm {unverified.email} before signing in — the link is in the
+              message we sent when the account was created.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="justify-self-start"
+              disabled={resendVerification.isPending}
+              onClick={() => resendVerification.mutate(unverified.email)}
+            >
+              {resendVerification.isPending
+                ? "Sending..."
+                : "Send a new verification link"}
+            </Button>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit((values) => login.mutate(values))}>
           <div className="grid gap-6">
             <Button
@@ -151,6 +188,7 @@ export function SignUpForm() {
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors },
   } = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
@@ -158,6 +196,29 @@ export function SignUpForm() {
   });
 
   const pending = signUp.isPending || googleSignIn.isPending;
+
+  // Sign-up answers the same way for a new address and for one that already has
+  // an account, and it hands back no session either way — so this can neither
+  // claim an account was created nor send anyone into the app.
+  if (signUp.isSuccess) {
+    return (
+      <Card>
+        <CardHeader className="text-center">
+          <CardTitle>Check your email</CardTitle>
+          <CardDescription>
+            If {getValues("email")} still needs verifying, a link is on its way.
+            Open it to finish setting up your Ragenta account — signing in only
+            works once the address is confirmed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="text-center">
+          <Link href="/login" className="text-sm text-primary hover:underline">
+            Back to sign in
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

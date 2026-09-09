@@ -26,6 +26,29 @@ function safeRedirect(value: string | null, fallback: string): string {
   return value;
 }
 
+/**
+ * Where the link in a verification email comes back to. The sign-in page, not a
+ * page inside the app: verifying signs the account in, and `requireUnAuth` there
+ * forwards a live session onwards — while a link that expired arrives with
+ * `?error=` and lands somewhere that can offer a fresh one.
+ */
+function verificationCallbackUrl(): string {
+  return `${window.location.origin}/login`;
+}
+
+/**
+ * Sign-in answers 403 when the password was *correct* but the address has not
+ * been confirmed yet — `requireEmailVerification` in `ragenta-backend`. It is
+ * carried as its own type so the form can offer a new link instead of telling
+ * the person their password was wrong.
+ */
+export class EmailNotVerifiedError extends Error {
+  constructor(readonly email: string) {
+    super("Email not verified.");
+    this.name = "EmailNotVerifiedError";
+  }
+}
+
 export function useLogin(redirectTo: string | null) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -33,6 +56,7 @@ export function useLogin(redirectTo: string | null) {
   return useMutation({
     mutationFn: async ({ email, password }: Credentials) => {
       const { data, error } = await authClient.signIn.email({ email, password });
+      if (error?.code === "EMAIL_NOT_VERIFIED") throw new EmailNotVerifiedError(email);
       if (error) throw new Error(error.message ?? "Sign in failed.");
       return data;
     },
@@ -44,15 +68,14 @@ export function useLogin(redirectTo: string | null) {
       router.refresh();
     },
     onError: (error: Error) => {
+      // The unverified case is shown inline instead, next to the way out of it.
+      if (error instanceof EmailNotVerifiedError) return;
       toast.error("Sign in failed", { description: error.message });
     },
   });
 }
 
 export function useSignUp() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async ({
       name,
@@ -63,19 +86,38 @@ export function useSignUp() {
         name,
         email,
         password,
+        callbackURL: verificationCallbackUrl(),
       });
       if (error) throw new Error(error.message ?? "Sign up failed.");
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: authKeys.session() });
-      // A verification mail is on its way, but the session is already live — so
-      // the next thing needed is a workspace, not an inbox.
-      router.push("/onboarding");
-      router.refresh();
-    },
+    // Deliberately no redirect and no session invalidation: sign-up no longer
+    // returns a session, and a 200 does not even mean the account is new — an
+    // address that already exists gets the same answer. The form says so.
     onError: (error: Error) => {
       toast.error("Sign up failed", { description: error.message });
+    },
+  });
+}
+
+export function useResendVerificationEmail() {
+  return useMutation({
+    mutationFn: async (email: string) => {
+      const { error } = await authClient.sendVerificationEmail({
+        email,
+        callbackURL: verificationCallbackUrl(),
+      });
+      if (error) throw new Error(error.message ?? "Could not send the email.");
+    },
+    onSuccess: () => {
+      // The endpoint answers the same for every address, so the wording cannot
+      // imply that one has an account or still needs verifying.
+      toast.success("Check your inbox", {
+        description: "If that address still needs verifying, a new link is on its way.",
+      });
+    },
+    onError: (error: Error) => {
+      toast.error("Request failed", { description: error.message });
     },
   });
 }

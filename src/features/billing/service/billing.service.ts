@@ -65,10 +65,29 @@ export const topupPackSchema = z.object({
   usdPerMillionCredits: z.number().optional(),
 });
 
+/**
+ * The bounds of a custom top-up, read from the server rather than repeated here
+ * — the checkout enforces these numbers, and a screen quoting a different rate
+ * would promise credits the payment does not buy.
+ *
+ * Defaulted so an older backend does not fail the whole price list.
+ */
+export const customTopupSchema = z.object({
+  minUsd: z.number(),
+  maxUsd: z.number(),
+  usdPerMillionCredits: z.number(),
+});
+
+/**
+ * The price list.
+ *
+ * `freeMonthlyCredits` is deliberately absent: free carries no allowance at all
+ * any more, so the server sends a permanent 0 that nothing here may quote.
+ * `signupGrantCredits` is the whole of the free tier and the only honest number
+ * to show for it.
+ */
 export const planCatalogueSchema = z.object({
   signupGrantCredits: z.number(),
-  /** Defaulted so an older backend does not fail the whole price list. */
-  freeMonthlyCredits: z.number().default(0),
   plans: z.array(
     z.object({
       name: z.string(),
@@ -77,6 +96,18 @@ export const planCatalogueSchema = z.object({
       flatCredits: z.number().nullable(),
       topupsEnabled: z.boolean(),
       modelTiers: z.array(z.string()),
+      /**
+       * What the plan unlocks beyond credits. Defaulted so an older backend does
+       * not fail the whole price list — and defaulted to *ungated*, because an
+       * API that does not send these fields is one that does not enforce them,
+       * so "unlimited" and "included" are what it actually does.
+       */
+      widgetLimit: z.number().nullable().default(null),
+      knowledgeBaseLimit: z.number().nullable().default(null),
+      agentLimit: z.number().nullable().default(null),
+      apiKeysEnabled: z.boolean().default(true),
+      dataSourcesEnabled: z.boolean().default(true),
+      automationEnabled: z.boolean().default(true),
       price: z.object({
         monthlyUsd: z.number().nullable(),
         perSeatUsd: z.number().nullable(),
@@ -87,7 +118,23 @@ export const planCatalogueSchema = z.object({
     }),
   ),
   topupPacks: z.array(topupPackSchema),
+  customTopup: customTopupSchema.default({
+    minUsd: 10,
+    maxUsd: 2000,
+    usdPerMillionCredits: 39,
+  }),
 });
+
+/**
+ * What a dollar amount buys, quoted the way the server grants it: rounded down,
+ * because a credit is a whole unit and the checkout will not grant a fraction.
+ */
+export function creditsForUsd(
+  amountUsd: number,
+  usdPerMillionCredits: number,
+): number {
+  return Math.floor((amountUsd * 1_000_000) / usdPerMillionCredits);
+}
 
 export const autoReloadSchema = z.object({
   enabled: z.boolean(),
@@ -109,8 +156,14 @@ export type CreditTransaction = z.infer<typeof creditTransactionSchema>;
 export type PlanCatalogue = z.infer<typeof planCatalogueSchema>;
 export type PlanOption = PlanCatalogue["plans"][number];
 export type TopupPack = z.infer<typeof topupPackSchema>;
+export type CustomTopupBounds = z.infer<typeof customTopupSchema>;
 export type AutoReload = z.infer<typeof autoReloadSchema>;
 export type PromoRedemption = z.infer<typeof promoRedemptionSchema>;
+
+export type CheckoutInput =
+  | { plan: string }
+  | { pack: string }
+  | { amountUsd: number };
 
 export async function getBillingSummary(workspaceId: string) {
   const response = await api.get(`workspaces/${workspaceId}/billing`);
@@ -151,15 +204,16 @@ export async function updateAutoReload(
 }
 
 /**
- * Checkout. Exactly one of `plan` or `pack` — a subscription and a one-off
- * top-up use different Stripe modes, and the backend refuses both at once.
+ * Checkout. Exactly one of `plan`, `pack` or `amountUsd` — a subscription and a
+ * one-off top-up use different Stripe modes, and the backend refuses more than
+ * one at once.
  *
  * A deployment with no Stripe keys refuses every payment route, which is why the
  * caller has to be ready to show that refusal rather than assume a URL.
  */
 export async function createCheckout(
   workspaceId: string,
-  input: { plan: string } | { pack: string },
+  input: CheckoutInput,
 ): Promise<{ url: string | null }> {
   const response = await api.post(`workspaces/${workspaceId}/billing/checkout`, {
     json: input,

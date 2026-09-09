@@ -18,6 +18,7 @@ import {
   redeemPromoCode,
   updateAutoReload,
 } from "../service/billing.service";
+import type { CheckoutInput } from "../service/billing.service";
 
 export function useBillingSummarySuspense(workspaceId: string) {
   return useSuspenseQuery(billingOptions.summary(workspaceId));
@@ -55,8 +56,7 @@ export function usePromoRedemptionsSuspense(workspaceId: string) {
  */
 export function useCheckout(workspaceId: string) {
   return useMutation({
-    mutationFn: (input: { plan: string } | { pack: string }) =>
-      createCheckout(workspaceId, input),
+    mutationFn: (input: CheckoutInput) => createCheckout(workspaceId, input),
     onSuccess: ({ url }) => {
       if (url) window.location.assign(url);
       else

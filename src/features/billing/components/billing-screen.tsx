@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -33,8 +34,9 @@ import {
   usePaymentsSuspense,
   useTransactionsSuspense,
 } from "../hooks/billing.hook";
+import { creditsForUsd } from "../service/billing.service";
 import type { BillingSummary } from "../service/billing.service";
-import type { PlanOption } from "../service/billing.service";
+import type { CustomTopupBounds, PlanOption } from "../service/billing.service";
 
 function planPrice(plan: PlanOption): string {
   if (plan.price.monthlyUsd !== null) {
@@ -46,14 +48,66 @@ function planPrice(plan: PlanOption): string {
   return "Talk to us";
 }
 
-function planCredits(plan: PlanOption): string {
+/**
+ * What the plan grants, and how often.
+ *
+ * A plan with neither figure grants nothing on a schedule, and that is two
+ * different situations: free is funded once by the signup grant and never again,
+ * enterprise is whatever the contract says. Saying "a month" about either would
+ * promise a refill that no job performs.
+ */
+function planCredits(plan: PlanOption, signupGrantCredits: number): string {
   if (plan.flatCredits !== null) {
     return `${formatCredits(plan.flatCredits)} credits a month`;
   }
   if (plan.creditsPerSeat !== null) {
     return `${formatCredits(plan.creditsPerSeat)} credits per seat a month`;
   }
+  if (plan.price.monthlyUsd === 0) {
+    return `${formatCredits(signupGrantCredits)} credits once, at signup`;
+  }
   return "Credits by agreement";
+}
+
+/** A counted plan cap, in the noun a customer recognises. `null` is unlimited. */
+function countLabel(limit: number | null, one: string, many: string): string {
+  if (limit === null) return `Unlimited ${many}`;
+  if (limit === 0) return `No ${many}`;
+  return `${limit} ${limit === 1 ? one : many}`;
+}
+
+/**
+ * What a typed amount buys, and what to say when it buys nothing yet.
+ *
+ * `credits: null` is what the Buy button reads to stay disabled, so the message
+ * under the field and the refusal can never disagree — and the floor is stated
+ * before it is reached, rather than by a checkout that refuses after the
+ * redirect.
+ */
+function customTopupQuote(amount: string, bounds: CustomTopupBounds) {
+  const dollars = Number(amount);
+
+  if (amount.trim() === "" || !Number.isFinite(dollars)) {
+    return {
+      credits: null,
+      hint: `${formatUsd(bounds.minUsd)} to ${formatUsd(bounds.maxUsd)}, at ${formatUsd(bounds.usdPerMillionCredits)} per million credits.`,
+    };
+  }
+  if (!Number.isInteger(dollars)) {
+    return { credits: null, hint: "Whole dollars only." };
+  }
+  if (dollars < bounds.minUsd) {
+    return { credits: null, hint: `${formatUsd(bounds.minUsd)} minimum.` };
+  }
+  if (dollars > bounds.maxUsd) {
+    return {
+      credits: null,
+      hint: `${formatUsd(bounds.maxUsd)} maximum — talk to us for anything larger.`,
+    };
+  }
+
+  const credits = creditsForUsd(dollars, bounds.usdPerMillionCredits);
+  return { credits, hint: `Buys ${formatCredits(credits)} credits.` };
 }
 
 export function BillingScreen() {
@@ -68,9 +122,12 @@ export function BillingScreen() {
   const searchParams = useSearchParams();
   const checkoutResult = searchParams.get("checkout");
   const [code, setCode] = useState("");
+  const [customAmount, setCustomAmount] = useState("");
 
   const mayPay = can("billing.manage");
   const current = summary.data.plan;
+  const customTopup = catalogue.data.customTopup;
+  const customQuote = customTopupQuote(customAmount, customTopup);
 
   return (
     <div className="space-y-6">
@@ -133,7 +190,7 @@ export function BillingScreen() {
           </Button>
         }
       >
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {catalogue.data.plans.map((plan) => {
             const isCurrent = plan.name === current;
             return (
@@ -150,7 +207,7 @@ export function BillingScreen() {
                 </div>
                 <p className="mt-1 text-lg font-semibold">{planPrice(plan)}</p>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {planCredits(plan)}
+                  {planCredits(plan, catalogue.data.signupGrantCredits)}
                 </p>
                 <ul className="mt-3 flex-1 space-y-1 text-xs text-muted-foreground">
                   <li>
@@ -159,9 +216,31 @@ export function BillingScreen() {
                       : `Up to ${plan.seatLimit} seats`}
                   </li>
                   <li>
+                    {countLabel(
+                      plan.knowledgeBaseLimit,
+                      "knowledge base",
+                      "knowledge bases",
+                    )}
+                  </li>
+                  <li>{countLabel(plan.agentLimit, "agent", "agents")}</li>
+                  <li>{countLabel(plan.widgetLimit, "widget", "widgets")}</li>
+                  <li>
                     {plan.modelTiers.includes("premium")
                       ? "Economy and premium models"
                       : "Economy models"}
+                  </li>
+                  <li>
+                    {plan.apiKeysEnabled ? "API keys" : "No API keys"}
+                  </li>
+                  <li>
+                    {plan.dataSourcesEnabled
+                      ? "External data sources"
+                      : "No external data sources"}
+                  </li>
+                  <li>
+                    {plan.automationEnabled
+                      ? "Webhooks and triggers"
+                      : "No webhooks or triggers"}
                   </li>
                   <li>
                     {plan.topupsEnabled
@@ -195,36 +274,79 @@ export function BillingScreen() {
 
       <DetailSection
         title="Top-up credits"
-        description="One-off packs. They never expire and are spent only once the plan bucket is empty."
+        description="One-off packs, or any amount you name. They never expire and are spent only once the plan bucket is empty."
       >
         {summary.data.limits.topupsEnabled ? (
-          <div className="grid gap-3 sm:grid-cols-3">
-            {catalogue.data.topupPacks.map((pack) => (
-              <div
-                key={pack.id}
-                className="flex items-center justify-between gap-3 rounded-lg border p-4"
-              >
-                <div>
-                  <p className="font-medium">{formatCredits(pack.credits)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatUsd(pack.priceUsd)}
-                    {pack.usdPerMillionCredits
-                      ? ` · ${formatUsd(pack.usdPerMillionCredits)}/M`
-                      : ""}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!mayPay || checkout.isPending}
-                  onClick={() => checkout.mutate({ pack: pack.id })}
+          <>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {catalogue.data.topupPacks.map((pack) => (
+                <div
+                  key={pack.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border p-4"
                 >
-                  <Zap className="size-4" />
-                  Buy
-                </Button>
+                  <div>
+                    <p className="font-medium">{formatCredits(pack.credits)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatUsd(pack.priceUsd)}
+                      {pack.usdPerMillionCredits
+                        ? ` · ${formatUsd(pack.usdPerMillionCredits)}/M`
+                        : ""}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!mayPay || checkout.isPending}
+                    onClick={() => checkout.mutate({ pack: pack.id })}
+                  >
+                    <Zap className="size-4" />
+                    Buy
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            <form
+              className="mt-3 flex flex-wrap items-end gap-3 rounded-lg border p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (customQuote.credits !== null) {
+                  checkout.mutate({ amountUsd: Number(customAmount) });
+                }
+              }}
+            >
+              <div className="grid gap-2">
+                <Label htmlFor="customTopupAmount">Or name an amount (USD)</Label>
+                <Input
+                  id="customTopupAmount"
+                  type="number"
+                  inputMode="numeric"
+                  min={customTopup.minUsd}
+                  max={customTopup.maxUsd}
+                  step={1}
+                  placeholder={String(customTopup.minUsd)}
+                  value={customAmount}
+                  onChange={(event) => setCustomAmount(event.target.value)}
+                  disabled={!mayPay}
+                  className="w-32"
+                />
               </div>
-            ))}
-          </div>
+              <Button
+                type="submit"
+                size="sm"
+                variant="outline"
+                disabled={
+                  !mayPay || checkout.isPending || customQuote.credits === null
+                }
+              >
+                <Zap className="size-4" />
+                Buy
+              </Button>
+              <p className="w-full text-xs text-muted-foreground">
+                {customQuote.hint}
+              </p>
+            </form>
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">
             The {current} plan cannot buy top-ups. Upgrade first — a plan is
