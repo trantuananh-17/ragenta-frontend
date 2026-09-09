@@ -32,6 +32,13 @@ import {
 } from "../hooks/webhooks.hook";
 import type { WebhookEndpoint, WebhookEvent } from "../service/webhooks.service";
 
+/** Shared with the locked replica, so the two cannot describe it differently. */
+const WEBHOOKS_DESCRIPTION =
+  "We POST a signed JSON body to your server when something happens here — a run finishes, a document finishes indexing. The signature proves it came from us and is not a replay.";
+
+const DELIVERIES_DESCRIPTION =
+  "Every attempt, with the answer your server gave. This is what settles whether an event was sent.";
+
 /**
  * Where this workspace asks to be told when something happens here.
  *
@@ -57,10 +64,7 @@ export function WebhooksScreen() {
 
   return (
     <div className="space-y-6">
-      <DetailSection
-        title="Webhooks"
-        description="We POST a signed JSON body to your server when something happens here — a run finishes, a document finishes indexing. The signature proves it came from us and is not a replay."
-      >
+      <DetailSection title="Webhooks" description={WEBHOOKS_DESCRIPTION}>
         {data.endpoints.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Nothing subscribed.{" "}
@@ -417,7 +421,7 @@ function DeliveryLog() {
   return (
     <DetailSection
       title="Deliveries"
-      description="Every attempt, with the answer your server gave. This is what settles whether an event was sent."
+      description={DELIVERIES_DESCRIPTION}
       actions={
         <Button variant="outline" size="sm" onClick={() => setOpen((value) => !value)}>
           {open ? "Hide" : "Show"}
@@ -486,6 +490,78 @@ function DeliveryLog() {
         </div>
       )}
     </DetailSection>
+  );
+}
+
+/**
+ * The screen as it looks with an endpoint subscribed, for a plan without
+ * automation. Invented rows in the real row markup, including the delivery log
+ * in its closed state — the log is half of why this screen is worth paying for,
+ * and a replica that left it out would undersell it.
+ */
+export function WebhooksPreview() {
+  return (
+    <div className="space-y-6">
+      <DetailSection title="Webhooks" description={WEBHOOKS_DESCRIPTION}>
+        <ul className="space-y-3">
+          <li className="rounded-md border p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 space-y-1">
+                <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                  <Send className="size-4 text-muted-foreground" />
+                  Order system
+                  <StatusBadge tone="success">on</StatusBadge>
+                </p>
+
+                <p className="font-mono text-xs text-muted-foreground">
+                  POST https://api.example.com/ragenta
+                </p>
+
+                <p className="text-xs text-muted-foreground">
+                  2 events: <span className="font-mono">agent.run.finished, document.indexed</span>
+                </p>
+
+                <p className="text-xs text-muted-foreground">
+                  Signs with <code className="font-mono">whsec_••••8d13</code> · last delivered 2
+                  Sep 2026, 14:20
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm">
+                  New secret
+                </Button>
+                <Button variant="outline" size="sm">
+                  Edit
+                </Button>
+                <Button variant="ghost" size="icon-sm" aria-label="Remove Order system">
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            </div>
+          </li>
+        </ul>
+
+        <Button className="mt-4" size="sm">
+          <Plus className="size-4" />
+          Add an endpoint
+        </Button>
+      </DetailSection>
+
+      <DetailSection
+        title="Deliveries"
+        description={DELIVERIES_DESCRIPTION}
+        actions={
+          <Button variant="outline" size="sm">
+            Show
+          </Button>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          Hidden until you ask for it — the log is long and most of it is uneventful.
+        </p>
+      </DetailSection>
+    </div>
   );
 }
 

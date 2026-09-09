@@ -160,6 +160,36 @@ export type CustomTopupBounds = z.infer<typeof customTopupSchema>;
 export type AutoReload = z.infer<typeof autoReloadSchema>;
 export type PromoRedemption = z.infer<typeof promoRedemptionSchema>;
 
+/**
+ * The all-or-nothing capabilities a plan either includes or does not, with the
+ * noun the backend's own 402 uses.
+ *
+ * Both sides say the same sentence about the same refusal, so both build it from
+ * the same words: a screen that called these "API access" while the server
+ * called them "API keys" would read as two different limits.
+ */
+export const GATED_PLAN_FEATURES = {
+  apiKeysEnabled: "API keys",
+  dataSourcesEnabled: "Data sources",
+  automationEnabled: "Webhooks and triggers",
+} as const;
+
+export type GatedPlanFeature = keyof typeof GATED_PLAN_FEATURES;
+
+/**
+ * The cheapest plan that includes a capability, or null when none does.
+ *
+ * Read out of the catalogue — which the server orders cheapest-first — rather
+ * than named here, so a plan added between the ones that exist cannot leave this
+ * sending somebody to a tier more expensive than the one that would have done.
+ */
+export function planUnlockingFeature(
+  catalogue: PlanCatalogue,
+  feature: GatedPlanFeature,
+): string | null {
+  return catalogue.plans.find((plan) => plan[feature])?.name ?? null;
+}
+
 export type CheckoutInput =
   | { plan: string }
   | { pack: string }

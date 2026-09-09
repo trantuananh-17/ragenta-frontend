@@ -21,6 +21,10 @@ import {
 import { QueryBuilder } from "./query-builder";
 import type { DataQuery, DataSource } from "../service/data-sources.service";
 
+/** Shared with the locked replica, so the two cannot describe it differently. */
+const DATABASES_DESCRIPTION =
+  "An agent can look things up in your own database — an order's status, a customer's plan. It never writes SQL: it runs questions you have approved.";
+
 /**
  * Databases an agent may look things up in.
  *
@@ -44,10 +48,7 @@ export function DataSourcesScreen() {
 
   return (
     <div className="space-y-6">
-      <DetailSection
-        title="Databases"
-        description="An agent can look things up in your own database — an order's status, a customer's plan. It never writes SQL: it runs questions you have approved."
-      >
+      <DetailSection title="Databases" description={DATABASES_DESCRIPTION}>
         {sources.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No database connected.{" "}
@@ -225,6 +226,106 @@ export function DataSourcesScreen() {
           removeQuery.mutate(removingQuery.id, { onSuccess: () => setRemovingQuery(null) });
         }}
       />
+    </div>
+  );
+}
+
+const PREVIEW_QUERIES = [
+  {
+    name: "order_status",
+    description: "Where an order has got to, by its reference.",
+    sql: "select status, shipped_at from orders where reference = $1",
+  },
+  {
+    name: "customer_plan",
+    description: "Which plan a customer is on, by email.",
+    sql: "select plan, renews_at from customers where email = $1",
+  },
+];
+
+/**
+ * The screen as it looks with a database on it, for a plan that may not connect
+ * one. Invented rows in the real row markup — this is what somebody is deciding
+ * whether to pay for, so it has to show the questions-not-SQL shape of the thing
+ * rather than a grey rectangle.
+ */
+export function DataSourcesPreview() {
+  return (
+    <div className="space-y-6">
+      <DetailSection title="Databases" description={DATABASES_DESCRIPTION}>
+        <ul className="space-y-4">
+          <li className="rounded-md border p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="flex items-center gap-2 text-sm font-medium">
+                  <Database className="size-4 text-muted-foreground" />
+                  Shop database
+                  <StatusBadge tone="neutral">postgres</StatusBadge>
+                </p>
+                <p className="mt-1 font-mono text-xs text-muted-foreground">
+                  postgres://readonly:••••@db.example.com:5432/shop
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">14 tables read 2 Sep 2026</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm">
+                  <RefreshCw className="size-4" />
+                  Read schema
+                </Button>
+                <Button variant="ghost" size="icon-sm" aria-label="Remove Shop database">
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 border-t pt-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Questions the agent may ask
+              </p>
+
+              <ul className="mt-2 space-y-2">
+                {PREVIEW_QUERIES.map((query) => (
+                  <li
+                    key={query.name}
+                    className="flex flex-wrap items-start justify-between gap-2 rounded border px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 font-mono text-xs">
+                        {query.name}
+                        <StatusBadge tone="success">approved</StatusBadge>
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {query.description}
+                      </p>
+                      <code className="mt-1 block overflow-x-auto text-[11px] text-muted-foreground/80">
+                        {query.sql}
+                      </code>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Remove ${query.name}`}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+
+              <Button className="mt-3" variant="outline" size="sm">
+                <Plus className="size-4" />
+                Add a question
+              </Button>
+            </div>
+          </li>
+        </ul>
+
+        <Button className="mt-4" size="sm">
+          <Plus className="size-4" />
+          Connect a database
+        </Button>
+      </DetailSection>
     </div>
   );
 }

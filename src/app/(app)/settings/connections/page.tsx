@@ -8,6 +8,7 @@ import {
   ConnectionsLoading,
   ConnectionsScreen,
 } from "@/features/connections/components";
+import { resolvePlanGate } from "@/features/billing/server/prefetch";
 import { prefetchConnections } from "@/features/connections/server/prefetch";
 import { getQueryClient } from "@/lib/get-query-client";
 import { requireWorkspace } from "@/lib/workspace";
@@ -16,7 +17,8 @@ export const metadata: Metadata = { title: "Connections" };
 
 export default async function ConnectionsPage() {
   const workspace = await requireWorkspace();
-  await prefetchConnections(workspace.id);
+  const apiKeysAllowed = await resolvePlanGate(workspace.id, "apiKeysEnabled");
+  await prefetchConnections(workspace.id, apiKeysAllowed);
 
   return (
     <HydrationBoundary state={dehydrate(getQueryClient())}>

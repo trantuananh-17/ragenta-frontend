@@ -6,6 +6,7 @@ import { AlertCircle, KeyRound, Link2, Plus, Trash2 } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DetailSection } from "@/components/detail-shell";
+import { PlanGate } from "@/components/plan-gate";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -150,7 +151,11 @@ export function ConnectionsScreen() {
         </ul>
       </DetailSection>
 
-      <ApiKeysSection />
+      {/* Only this half is gated. Connected accounts are on every plan, so the
+          gate goes here rather than around the screen. */}
+      <PlanGate feature="apiKeysEnabled" preview={<ApiKeysPreview />}>
+        <ApiKeysSection />
+      </PlanGate>
 
       <ConfirmDialog
         open={removing !== null}
@@ -169,6 +174,10 @@ export function ConnectionsScreen() {
   );
 }
 
+/** Shared with the locked replica, so the two cannot describe it differently. */
+const API_KEYS_DESCRIPTION =
+  "For a program calling Ragenta instead of a person. A key carries a subset of what you can do — and it keeps only what you still can, so a key you made stops doing what you stop being allowed to do.";
+
 function ApiKeysSection() {
   const { workspace, can } = useWorkspace();
   const { data: keys } = useApiKeysSuspense(workspace.id);
@@ -182,10 +191,7 @@ function ApiKeysSection() {
 
   return (
     <>
-      <DetailSection
-        title="API keys"
-        description="For a program calling Ragenta instead of a person. A key carries a subset of what you can do — and it keeps only what you still can, so a key you made stops doing what you stop being allowed to do."
-      >
+      <DetailSection title="API keys" description={API_KEYS_DESCRIPTION}>
         {keys.length === 0 ? (
           <p className="text-sm text-muted-foreground">No keys yet.</p>
         ) : (
@@ -254,6 +260,58 @@ function ApiKeysSection() {
         }}
       />
     </>
+  );
+}
+
+const PREVIEW_KEYS = [
+  {
+    name: "Order sync script",
+    hint: "rg_live_••••4f21",
+    permissions: 3,
+    used: "last used 2 Sep 2026",
+  },
+  { name: "Support bot", hint: "rg_live_••••9ac0", permissions: 1, used: "never used" },
+];
+
+/**
+ * The section as it looks once there are keys in it, for a plan that cannot mint
+ * one yet. Invented rows in the real row markup — somebody deciding whether to
+ * pay for this should see the thing rather than a grey rectangle, and keeping it
+ * beside the real list is what stops the two drifting apart.
+ */
+function ApiKeysPreview() {
+  return (
+    <DetailSection title="API keys" description={API_KEYS_DESCRIPTION}>
+      <ul className="space-y-2">
+        {PREVIEW_KEYS.map((key) => (
+          <li
+            key={key.name}
+            className="flex flex-wrap items-start justify-between gap-2 rounded-md border px-3 py-2"
+          >
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <KeyRound className="size-4 text-muted-foreground" />
+                {key.name}
+                <StatusBadge tone="success">active</StatusBadge>
+              </p>
+              <p className="mt-0.5 font-mono text-xs text-muted-foreground">{key.hint}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {key.permissions} {key.permissions === 1 ? "permission" : "permissions"} ·{" "}
+                {key.used}
+              </p>
+            </div>
+            <Button variant="ghost" size="icon-sm" aria-label={`Revoke ${key.name}`}>
+              <Trash2 className="size-4" />
+            </Button>
+          </li>
+        ))}
+      </ul>
+
+      <Button className="mt-4" size="sm">
+        <Plus className="size-4" />
+        Create a key
+      </Button>
+    </DetailSection>
   );
 }
 

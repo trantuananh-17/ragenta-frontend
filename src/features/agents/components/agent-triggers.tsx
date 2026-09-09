@@ -79,6 +79,9 @@ function timezoneOptions(): string[] {
  * failed. A webhook's secret is shown once, at creation, because it is stored
  * hashed and there is genuinely nothing to show afterwards.
  */
+const TRIGGERS_DESCRIPTION =
+	"A schedule runs this agent on a clock; a webhook lets another system start it. Both spend credits with nobody watching, so a broken one is backed off rather than retried forever."
+
 export function AgentTriggers({
   workspaceId,
   agentId,
@@ -104,7 +107,7 @@ export function AgentTriggers({
     <div className="space-y-6">
       <DetailSection
         title="Triggers"
-        description="A schedule runs this agent on a clock; a webhook lets another system start it. Both spend credits with nobody watching, so a broken one is backed off rather than retried forever."
+        description={TRIGGERS_DESCRIPTION}
         actions={
           !adding && (
             <Button
@@ -510,5 +513,40 @@ function TriggerForm({
         </Button>
       </div>
     </DetailSection>
+  );
+}
+
+/**
+ * What triggers look like on a plan that does not include them.
+ *
+ * Shares `TRIGGERS_DESCRIPTION` with the real section so the two cannot drift,
+ * and invents its rows rather than reading any: a replica exists so somebody can
+ * see the feature before paying for it, and fetching a workspace's real triggers
+ * to hide them behind a dimmed layer would be the leak this gate exists to avoid.
+ */
+export function AgentTriggersPreview() {
+  return (
+    <div className="space-y-6">
+      <DetailSection title="Triggers" description={TRIGGERS_DESCRIPTION}>
+        <ul className="space-y-3">
+          <li className="rounded-md border p-4">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <Clock className="size-4 text-muted-foreground" />
+              Every weekday at 08:00
+            </p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">0 8 * * 1-5</p>
+          </li>
+          <li className="rounded-md border p-4">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <Webhook className="size-4 text-muted-foreground" />
+              Orders webhook
+            </p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">
+              whsec_••••••••••••
+            </p>
+          </li>
+        </ul>
+      </DetailSection>
+    </div>
   );
 }

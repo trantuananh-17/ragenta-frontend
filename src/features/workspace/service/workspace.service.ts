@@ -30,6 +30,18 @@ export const planLimitsSchema = z.object({
   flatCredits: z.number().nullable(),
   topupsEnabled: z.boolean(),
   modelTiers: z.array(z.string()),
+  /**
+   * What this workspace's plan unlocks beyond credits, as the same three
+   * booleans the price list carries — a gated screen reads them from here rather
+   * than looking its own plan up in the catalogue.
+   *
+   * Defaulted to *included*, because an API old enough not to send them is one
+   * that does not enforce them: locking a screen the server would happily serve
+   * is the worse of the two mistakes.
+   */
+  apiKeysEnabled: z.boolean().default(true),
+  dataSourcesEnabled: z.boolean().default(true),
+  automationEnabled: z.boolean().default(true),
   price: planPriceSchema,
   stripePriceKey: z.string().nullable(),
 });

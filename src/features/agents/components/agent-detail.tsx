@@ -32,7 +32,8 @@ import { emptyGraph, type AgentGraph } from "../flow/graph-model";
 import { configFrom } from "../service/agents.service";
 import { AgentConfigForm } from "./agent-config-form";
 import { AgentRunPanel } from "./agent-run-panel";
-import { AgentTriggers } from "./agent-triggers";
+import { PlanGate } from "@/components/plan-gate";
+import { AgentTriggers, AgentTriggersPreview } from "./agent-triggers";
 import { AgentVersions } from "./agent-versions";
 import { AgentStatusBadge } from "./agents-list";
 import { RunStatusBadge } from "./run-detail";
@@ -184,11 +185,13 @@ export function AgentDetail({ agentId }: { agentId: string }) {
         </TabsContent>
 
         <TabsContent value="triggers" className="mt-4">
-          <AgentTriggers
-            workspaceId={workspace.id}
-            agentId={agentId}
-            disabled={!mayEdit}
-          />
+          <PlanGate feature="automationEnabled" preview={<AgentTriggersPreview />}>
+            <AgentTriggers
+              workspaceId={workspace.id}
+              agentId={agentId}
+              disabled={!mayEdit}
+            />
+          </PlanGate>
         </TabsContent>
 
         <TabsContent value="versions" className="mt-4">
