@@ -10,8 +10,11 @@ import { cn } from "@/lib/utils";
  * billing are settings of the same object — splitting them across three
  * top-level destinations would make "where do I change X" a guess.
  *
- * The title band and the pages below it share one content width, so the tabs
- * line up with the sections they switch between rather than running wider.
+ * The title band and the pages below it share `DetailShell`'s own width, not a
+ * narrower one. Settings is reached from the same sidebar as Usage and Agents,
+ * and a narrower column here made the whole page jump inward on the way in —
+ * the tabs have to line up with the screens either side of them, not just with
+ * the sections underneath.
  */
 export default function SettingsLayout({
   children,
@@ -21,7 +24,7 @@ export default function SettingsLayout({
   return (
     <div className="flex h-full flex-col overflow-auto">
       <div className="border-b bg-background px-4 pt-6 md:px-10">
-        <div className={cn("mx-auto w-full", CONTENT_WIDTHS.medium)}>
+        <div className={cn("mx-auto w-full", CONTENT_WIDTHS.wide)}>
           <PageHeader
             title="Workspace settings"
             description={
@@ -44,7 +47,7 @@ export default function SettingsLayout({
         <div
           className={cn(
             "mx-auto flex w-full flex-col gap-6",
-            CONTENT_WIDTHS.medium,
+            CONTENT_WIDTHS.wide,
           )}
         >
           {children}

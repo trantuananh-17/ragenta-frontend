@@ -9,6 +9,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { DetailShell } from "@/components/detail-shell";
 import { EntityPagination } from "@/components/entity-components";
 import { PageHeader } from "@/components/page-header";
 import { StatCard, StatCardGrid } from "@/components/stat-card";
@@ -80,7 +81,7 @@ export function UsageScreen() {
   );
 
   return (
-    <div className="flex h-full flex-col gap-6 overflow-auto p-4 md:px-10 md:py-6">
+    <DetailShell>
       <PageHeader
         title="Usage"
         description="Every charge the workspace has taken, priced from the provider's own token counts."
@@ -246,7 +247,7 @@ export function UsageScreen() {
           <ProviderErrorsPanel workspaceId={workspace.id} />
         </TabsContent>
       </Tabs>
-    </div>
+    </DetailShell>
   );
 }
 
