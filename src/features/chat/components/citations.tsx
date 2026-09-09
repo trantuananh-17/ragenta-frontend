@@ -2,7 +2,7 @@
 
 import { Children, Fragment, type ReactNode } from "react";
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { ChevronDown, FileText } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -163,9 +163,16 @@ export function SourceList({ citations }: { citations: Citation[] }) {
 
   return (
     <Collapsible className="mt-3 text-xs">
-      <CollapsibleTrigger className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground">
+      {/*
+        The chevron is the only thing that says the count opens: a line of muted
+        text that happens to be a button is indistinguishable from the caption
+        it sits next to, and the sources are the whole reason to trust the
+        answer above them.
+      */}
+      <CollapsibleTrigger className="group flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground">
         <FileText className="size-3.5" />
         {citations.length === 1 ? "1 source" : `${citations.length} sources`}
+        <ChevronDown className="size-3.5 transition-transform duration-150 group-data-[state=open]:rotate-180 motion-reduce:transition-none" />
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-2 space-y-2">
         {citations.map((citation) => (

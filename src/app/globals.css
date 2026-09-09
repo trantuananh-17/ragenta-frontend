@@ -144,3 +144,45 @@ html,
 body {
   height: 100%;
 }
+
+@keyframes text-shimmer {
+  from {
+    background-position: 100% center;
+  }
+  to {
+    background-position: 0% center;
+  }
+}
+
+/*
+ * A label for a wait whose length nobody knows — retrieval, or the gap before
+ * the first token. A sweep rather than a blink or a spinner: it says "still
+ * working" without implying progress towards a point, which is the one thing a
+ * chat turn cannot honestly claim.
+ *
+ * Both stops are theme tokens, so the band is the readable direction in either
+ * theme — bright text over muted in the dark, dark over grey in the light —
+ * and the text stays legible for the whole sweep rather than washing out.
+ */
+@utility text-shimmer {
+  background-image:
+    linear-gradient(
+      90deg,
+      transparent calc(50% - 3rem),
+      var(--foreground),
+      transparent calc(50% + 3rem)
+    ),
+    linear-gradient(var(--muted-foreground), var(--muted-foreground));
+  background-repeat: no-repeat, padding-box;
+  background-size: 250% 100%, auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shimmer 2.4s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    background-image: none;
+    color: var(--muted-foreground);
+    animation: none;
+  }
+}

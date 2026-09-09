@@ -92,13 +92,17 @@ export function ConversationView({ conversationId }: { conversationId: string })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
+  // `pending` is in the dependencies as well as the content: the reveal is
+  // paced a little behind the stream, so the last words appear when the turn
+  // ends rather than when the last delta arrived, and without this the tail of
+  // a long answer settles just below the fold.
   useEffect(() => {
     if (!atBottomRef.current) return;
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages.data.items.length, streaming?.content]);
+  }, [messages.data.items.length, streaming?.content, pending]);
 
   const mayChat = can("chat.send");
 
@@ -159,6 +163,12 @@ export function ConversationView({ conversationId }: { conversationId: string })
         }}
         className="min-h-0 flex-1 overflow-y-auto"
       >
+        {/*
+          `space-y-6` is also the clearance the hover stamp needs: it hangs
+          about 11px below its own message and takes no layout, so the 24px gap
+          leaves it nearer the message it labels than the next one. Tightening
+          this would put a question's time under the answer that follows it.
+        */}
         <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-6">
           {messages.data.items.map((message, index) => {
             const previous = messages.data.items[index - 1];
@@ -177,6 +187,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
               phase={streaming.phase}
               searchedFor={streaming.searchedFor}
               grounded={conversation.data.knowledgeBaseId !== null}
+              // The answer outlives the stream by however long the refetch
+              // takes, so `pending` — not the presence of `streaming` — is what
+              // says tokens are still arriving, and what makes the last words
+              // appear the moment the turn ends instead of a frame later.
+              live={pending}
               stopping={streaming.stopping}
             />
           )}

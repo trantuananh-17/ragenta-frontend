@@ -59,3 +59,31 @@ export function formatRelative(value: string | Date | null | undefined): string 
   if (days < 30) return `${days}d ago`;
   return formatDate(date);
 }
+
+/**
+ * A message's own time, the way a transcript shows it: the clock alone for
+ * today, the date as well for anything older.
+ *
+ * Empty rather than the "—" the helpers above return, because the caller
+ * renders nothing at all when there is no time. A missing or unparseable
+ * `createdAt` means the age of that message is unknown, and a placeholder — let
+ * alone today's clock — would read as authoritative with nothing to prompt a
+ * second look. No time is the honest answer.
+ */
+export function formatMessageTime(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const now = new Date();
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  return date.toLocaleString(undefined, {
+    ...(isToday ? {} : { month: "short", day: "numeric" }),
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
