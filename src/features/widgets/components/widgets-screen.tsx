@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Globe, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, BarChart3, Globe, Plus, Trash2 } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { WidgetActivityDialog } from "./widget-activity-dialog";
 import { DetailSection } from "@/components/detail-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ export function WidgetsScreen() {
 
   const [editing, setEditing] = useState<Widget | "new" | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<Widget | null>(null);
+  const [inspecting, setInspecting] = useState<Widget | null>(null);
 
   const mayManage = can("widget.manage");
   const remove = useDeleteWidget(workspace.id);
@@ -80,6 +82,14 @@ export function WidgetsScreen() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => setInspecting(widget)}
+                    >
+                      <BarChart3 className="size-4" />
+                      Activity
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       disabled={!mayManage}
                       onClick={() => setEditing(widget)}
                     >
@@ -117,6 +127,15 @@ export function WidgetsScreen() {
           widget={editing === "new" ? undefined : editing}
           agents={agents.items.map((agent) => ({ id: agent.id, name: agent.name }))}
           onDone={() => setEditing(null)}
+        />
+      )}
+
+      {inspecting && (
+        <WidgetActivityDialog
+          workspaceId={workspace.id}
+          widget={inspecting}
+          open
+          onOpenChange={(next) => !next && setInspecting(null)}
         />
       )}
 

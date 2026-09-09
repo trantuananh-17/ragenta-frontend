@@ -70,3 +70,61 @@ export function embedSnippet(publicKey: string): string {
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   return `<script src="${origin}/widget.js" data-key="${publicKey}"></script>`;
 }
+
+/**
+ * `GET /workspaces/:id/widgets/:id/usage` — what one embedded chat has answered.
+ *
+ * Credits only, never dollars. What this workspace was charged is theirs to see;
+ * what the deployment paid its providers is a different number that belongs to
+ * the operator, and mixing the two here would put our margin on a customer's
+ * screen.
+ */
+export const widgetUsageSchema = z.object({
+  range: z.object({ from: z.string(), to: z.string() }),
+  widget: z.object({ id: z.string(), name: z.string(), enabled: z.boolean() }),
+  today: z.object({ spent: z.number(), ceiling: z.number() }),
+  totals: z
+    .object({
+      messages: z.number(),
+      succeeded: z.number(),
+      failed: z.number(),
+      credits: z.string(),
+      avgDurationMs: z.number().nullable(),
+    })
+    .nullish(),
+  daily: z.array(
+    z.object({ day: z.string(), messages: z.number(), credits: z.string() }),
+  ),
+  recent: z.array(
+    z.object({
+      id: z.string(),
+      status: z.string(),
+      createdAt: z.coerce.string(),
+      credits: z.string(),
+      error: z.string().nullable(),
+      question: z.string().nullable(),
+      answer: z.string().nullable(),
+      durationMs: z.number().nullable(),
+    }),
+  ),
+});
+
+export type WidgetUsage = z.infer<typeof widgetUsageSchema>;
+
+export async function getWidgetUsage(
+  workspaceId: string,
+  widgetId: string,
+  days: number,
+): Promise<WidgetUsage> {
+  const response = await api.get(`workspaces/${workspaceId}/widgets/${widgetId}/usage`, {
+    searchParams: { from: daysAgo(days), limit: 30 },
+  });
+  return widgetUsageSchema.parse(await response.json());
+}
+
+/** `YYYY-MM-DD`, in UTC — the calendar the backend reads the range in. */
+function daysAgo(days: number): string {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}

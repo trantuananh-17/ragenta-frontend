@@ -1,6 +1,11 @@
 "use client";
 
-import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { errorMessage } from "@/lib/api-error";
@@ -9,6 +14,18 @@ import { deleteWidget, saveWidget, type SaveWidgetInput } from "../service/widge
 
 export function useWidgetsSuspense(workspaceId: string) {
   return useSuspenseQuery(widgetOptions.list(workspaceId));
+}
+
+/** Only fetched while the activity panel is open — one widget out of a list. */
+export function useWidgetUsage(
+  workspaceId: string,
+  widgetId: string | null,
+  days: number,
+) {
+  return useQuery({
+    ...widgetOptions.usage(workspaceId, widgetId ?? "", days),
+    enabled: widgetId !== null,
+  });
 }
 
 export function useSaveWidget(workspaceId: string) {
