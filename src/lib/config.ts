@@ -11,6 +11,7 @@ declare global {
     __env?: {
       APP_BASE_URL?: string;
       SITE_BASE_URL?: string;
+      DOCS_BASE_URL?: string;
     };
   }
 }
@@ -29,3 +30,7 @@ export const appBaseUrl = () =>
 /** The marketing site — where the legal pages and pricing actually live. */
 export const siteBaseUrl = () =>
   runtimeEnv("SITE_BASE_URL", "http://localhost:3000");
+
+/** The user guide (ragenta-docs). One deployment serves every environment. */
+export const docsBaseUrl = () =>
+  runtimeEnv("DOCS_BASE_URL", "https://docs.ragenta.cloud");

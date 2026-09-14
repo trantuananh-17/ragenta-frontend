@@ -10,6 +10,7 @@ export function EnvScript() {
   const env = {
     APP_BASE_URL: process.env.APP_BASE_URL ?? "",
     SITE_BASE_URL: process.env.SITE_BASE_URL ?? "",
+    DOCS_BASE_URL: process.env.DOCS_BASE_URL ?? "",
   };
 
   return (

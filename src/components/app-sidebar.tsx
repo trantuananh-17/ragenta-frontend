@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   BookOpen,
+  BookText,
   Bot,
   CreditCard,
   FolderKanban,
@@ -30,6 +31,7 @@ import {
 import { ChatSessionsNav } from "@/features/chat/components/chat-sessions-nav";
 import { WorkspaceSwitcher } from "@/features/workspace/components/workspace-switcher";
 import { usePersistentState } from "@/hooks/use-persistent-state";
+import { docsBaseUrl } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { CommandPaletteTrigger } from "./command-palette";
 
@@ -134,6 +136,22 @@ function WorkspaceNav() {
           </SidebarGroupContent>
         </SidebarGroup>
       ))}
+      {/* Outside navGroups on purpose: the header derives its breadcrumb from
+          those, and an external destination has no place in a trail. */}
+      <SidebarGroup className="mt-auto">
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Docs" className="h-9 gap-x-3 px-3">
+                <a href={docsBaseUrl()} target="_blank" rel="noreferrer">
+                  <BookText className="size-4" />
+                  <span>Docs</span>
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
     </>
   );
 }
