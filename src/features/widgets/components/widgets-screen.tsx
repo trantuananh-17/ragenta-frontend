@@ -25,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAgentsSuspense } from "@/features/agents/hooks/agents.hook";
 import { useWorkspace } from "@/features/workspace/components/workspace-provider";
 import { useDeleteWidget, useSaveWidget, useWidgetsSuspense } from "../hooks/widgets.hook";
-import { embedSnippet, type Widget } from "../service/widgets.service";
+import { embedSnippet, identifiedEmbedSnippet, type Widget } from "../service/widgets.service";
 
 /**
  * The chat bubble a customer puts on their own website.
@@ -110,6 +110,12 @@ export function WidgetsScreen() {
                 </div>
 
                 <EmbedSnippet publicKey={widget.publicKey} />
+                {widget.identitySecret && (
+                  <IdentitySnippet
+                    publicKey={widget.publicKey}
+                    identitySecret={widget.identitySecret}
+                  />
+                )}
               </li>
             ))}
           </ul>
@@ -174,6 +180,54 @@ function EmbedSnippet({ publicKey }: { publicKey: string }) {
         Paste it before <code className="font-mono">&lt;/body&gt;</code>. The key is meant to be
         public — it only works on the sites listed above.
       </p>
+    </div>
+  );
+}
+
+/**
+ * How the host site tells the agent who is chatting, so a connection can carry
+ * `{{visitor.id}}` to their own API. Collapsed by default: most widgets never
+ * need it, and the secret should not be on screen for everyone who opens the
+ * page.
+ */
+function IdentitySnippet({
+  publicKey,
+  identitySecret,
+}: {
+  publicKey: string;
+  identitySecret: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const snippet = identifiedEmbedSnippet(publicKey);
+
+  if (!open) {
+    return (
+      <Button variant="link" size="sm" className="mt-1 h-auto px-0" onClick={() => setOpen(true)}>
+        Identify signed-in visitors…
+      </Button>
+    );
+  }
+
+  return (
+    <div className="mt-3 space-y-2 rounded-md border bg-muted/40 p-3">
+      <p className="text-xs">
+        Your server signs the user id with this secret and renders it into the tag. The agent can
+        then pass <code className="font-mono">{"{{visitor.id}}"}</code> and{" "}
+        <code className="font-mono">{"{{visitor.email}}"}</code> to your API through a connection.
+        Keep the secret on the server — never in the page.
+      </p>
+      <div className="flex items-center gap-2">
+        <code className="min-w-0 flex-1 overflow-x-auto rounded-sm bg-background px-2 py-1.5 font-mono text-xs">
+          {identitySecret}
+        </code>
+        <CopyButton value={identitySecret} label="Copy secret" />
+      </div>
+      <div className="flex items-start gap-2">
+        <pre className="min-w-0 flex-1 overflow-x-auto rounded-sm bg-background px-2 py-1.5 font-mono text-xs">
+          {snippet}
+        </pre>
+        <CopyButton value={snippet} label="Copy" />
+      </div>
     </div>
   );
 }

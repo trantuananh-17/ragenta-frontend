@@ -3,6 +3,13 @@
  *
  *   <script src="https://.../widget.js" data-key="rgpk_..."></script>
  *
+ * To tell the agent who is chatting, the host's **server** renders three more
+ * attributes — the hash is HMAC-SHA256(identity secret, user id), hex, computed
+ * where the secret lives and never in the browser:
+ *
+ *   <script src="..." data-key="rgpk_..."
+ *     data-user-id="42" data-user-email="a@shop.test" data-user-hash="…"></script>
+ *
  * **This runs on the customer's own page, and that is the design rather than a
  * shortcut.** The plan was an iframe, and an iframe cannot work here: a request
  * made from inside one carries `Origin: <our domain>`, not the shop's — so the
@@ -43,6 +50,22 @@
    */
   var base = new URL(script.src).origin + "/api";
   var storageKey = "ragenta.visitor." + key;
+
+  /**
+   * Who the host site says this is. Only sent when it is signed: an id without
+   * a hash is a claim the server would refuse anyway, and sending it would turn
+   * a misconfigured page into a chat that refuses every message.
+   */
+  var userId = script.getAttribute("data-user-id");
+  var userHash = script.getAttribute("data-user-hash");
+  var visitor = null;
+  if (userId && userHash) {
+    visitor = { id: userId, hash: userHash };
+    var userEmail = script.getAttribute("data-user-email");
+    if (userEmail) visitor.email = userEmail;
+  } else if (userId) {
+    console.warn("[ragenta] data-user-id needs data-user-hash, signed on your server; ignoring it");
+  }
 
   var state = { open: false, sending: false };
   var el = {};
@@ -191,7 +214,7 @@
     fetch(base + "/v1/widget/" + encodeURIComponent(key) + "/messages", {
       method: "POST",
       headers: { "content-type": "application/json", "x-ragenta-visitor": readToken() },
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify(visitor ? { message: text, visitor: visitor } : { message: text }),
     })
       .then(function (response) {
         var issued = response.headers.get("x-ragenta-visitor");

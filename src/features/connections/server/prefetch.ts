@@ -19,6 +19,7 @@ export async function prefetchConnections(
   await Promise.all([
     queryClient.prefetchQuery(connectionOptions.providers(workspaceId)),
     queryClient.prefetchQuery(connectionOptions.oauth(workspaceId)),
+    queryClient.prefetchQuery(connectionOptions.http(workspaceId)),
     ...(apiKeysAllowed
       ? [
           queryClient.prefetchQuery(connectionOptions.apiKeys(workspaceId)),

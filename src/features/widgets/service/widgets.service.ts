@@ -16,6 +16,12 @@ export const widgetSchema = z.object({
   name: z.string(),
   enabled: z.boolean(),
   publicKey: z.string(),
+  /**
+   * The one secret this app does show. The customer's server needs it to sign
+   * who a visitor is, and a secret they cannot read is one they cannot use.
+   * Null only on a widget saved before identity existed; saving it fills it.
+   */
+  identitySecret: z.string().nullable(),
   allowedOrigins: z.array(z.string()),
   greeting: z.string(),
   accentColor: z.string(),
@@ -69,6 +75,21 @@ export async function deleteWidget(workspaceId: string, widgetId: string): Promi
 export function embedSnippet(publicKey: string): string {
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   return `<script src="${origin}/widget.js" data-key="${publicKey}"></script>`;
+}
+
+/**
+ * The same tag, rendered by the host's server for a signed-in user. The hash is
+ * what makes the identity trustworthy, so the snippet shows where it comes from
+ * rather than a value to paste.
+ */
+export function identifiedEmbedSnippet(publicKey: string): string {
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  return [
+    `<!-- server-side: hash = HMAC_SHA256(identitySecret, user.id).hex -->`,
+    `<script src="${origin}/widget.js" data-key="${publicKey}"`,
+    `  data-user-id="{{ user.id }}" data-user-email="{{ user.email }}"`,
+    `  data-user-hash="{{ hash }}"></script>`,
+  ].join("\n");
 }
 
 /**

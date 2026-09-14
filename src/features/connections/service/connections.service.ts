@@ -116,3 +116,79 @@ export async function getMyPermissions(workspaceId: string): Promise<string[]> {
   const body = await response.json();
   return z.object({ permissions: z.array(z.string()) }).parse(body).permissions;
 }
+
+/**
+ * An HTTP API of the workspace's own — their shop, their CRM — that an agent
+ * calls through `api_call`. The key is write-only: it is stored encrypted and
+ * only its masked hint comes back, so the form can rotate it but never read it.
+ */
+export const httpConnectionSchema = z.object({
+  id: z.string(),
+  /** `platform` rows are the deployment's, offered read-only alongside ours. */
+  scope: z.enum(["workspace", "platform"]),
+  kind: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  enabled: z.boolean(),
+  baseUrl: z.string().nullable(),
+  hasSecret: z.boolean(),
+  secretHint: z.string().nullable(),
+  authHeader: z.string().nullable(),
+  authPrefix: z.string(),
+  extraHeaders: z.record(z.string(), z.string()).default({}),
+  allowedMethods: z.array(z.string()),
+  allowedPathPrefix: z.string(),
+  lastUsedAt: z.coerce.string().nullable(),
+  lastCheckedAt: z.coerce.string().nullable(),
+  lastCheckOk: z.boolean().nullable(),
+  lastCheckError: z.string().nullable(),
+});
+
+export type HttpConnection = z.infer<typeof httpConnectionSchema>;
+
+export async function getHttpConnections(workspaceId: string): Promise<HttpConnection[]> {
+  const response = await api.get(`workspaces/${workspaceId}/connections`);
+  const body = await response.json();
+  return z
+    .array(httpConnectionSchema)
+    .parse(body)
+    .filter((connection) => connection.kind === "http_api");
+}
+
+export interface SaveHttpConnectionInput {
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  baseUrl: string;
+  /** Absent keeps the stored key. */
+  secret?: string;
+  authHeader: string | null;
+  authPrefix: string;
+  extraHeaders: Record<string, string>;
+  allowedMethods: string[];
+  allowedPathPrefix: string;
+}
+
+export async function saveHttpConnection(
+  workspaceId: string,
+  slug: string,
+  input: SaveHttpConnectionInput,
+): Promise<HttpConnection> {
+  const response = await api.put(`workspaces/${workspaceId}/connections/${slug}`, {
+    json: { kind: "http_api", allowedRecipients: [], ...input },
+  });
+  return httpConnectionSchema.parse(await response.json());
+}
+
+export async function deleteHttpConnection(workspaceId: string, slug: string): Promise<void> {
+  await api.delete(`workspaces/${workspaceId}/connections/${slug}`);
+}
+
+/** Makes one real, authenticated call so a wrong key is found here and not by a visitor. */
+export async function checkHttpConnection(
+  workspaceId: string,
+  slug: string,
+): Promise<{ ok: boolean; detail: string }> {
+  const response = await api.post(`workspaces/${workspaceId}/connections/${slug}/check`);
+  return z.object({ ok: z.boolean(), detail: z.string() }).parse(await response.json());
+}

@@ -28,6 +28,7 @@ import {
   useStartOAuth,
 } from "../hooks/connections.hook";
 import type { ApiKey, OAuthConnection } from "../service/connections.service";
+import { ApiConnectionsSection } from "./api-connections-section";
 
 /**
  * What can act on this workspace's behalf, and as whom.
@@ -155,6 +156,8 @@ export function ConnectionsScreen() {
           })}
         </ul>
       </DetailSection>
+
+      <ApiConnectionsSection />
 
       {/* Only this half is gated. Connected accounts are on every plan, so the
           gate goes here rather than around the screen. */}
