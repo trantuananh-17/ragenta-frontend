@@ -272,6 +272,13 @@
               } else if (event.type === "error") {
                 bubble.className = "msg err";
                 bubble.textContent = event.message || "Something went wrong.";
+              } else if (event.type === "awaiting_input") {
+                // The agent paused for an approval or an answer only a Ragenta
+                // member can give. A visitor cannot, so say so rather than
+                // sitting on an ellipsis — and tell the owner what to change.
+                bubble.className = "msg err";
+                bubble.textContent =
+                  "Sorry — I can't finish that here. (Site owner: this agent is set to ask before it acts; turn that off for an embedded chat.)";
               }
             });
 
