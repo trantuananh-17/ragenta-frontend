@@ -6,6 +6,7 @@ import { AlertCircle, BarChart3, Globe, Plus, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CopyButton } from "@/components/copy-button";
 import { WidgetActivityDialog } from "./widget-activity-dialog";
+import { WidgetPreview } from "./widget-preview";
 import { DetailSection } from "@/components/detail-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -250,13 +251,18 @@ function WidgetForm({
   const [title, setTitle] = useState(widget?.title ?? "Chat");
   const [greeting, setGreeting] = useState(widget?.greeting ?? "");
   const [accentColor, setAccentColor] = useState(widget?.accentColor ?? "#7c3aed");
+  const [position, setPosition] = useState<Widget["position"]>(widget?.position ?? "right");
+  const [language, setLanguage] = useState<Widget["language"]>(widget?.language ?? "en");
+  const [launcherLabel, setLauncherLabel] = useState(widget?.launcherLabel ?? "");
+  const [placeholder, setPlaceholder] = useState(widget?.placeholder ?? "Type a message…");
+  const [quickQuestions, setQuickQuestions] = useState(
+    (widget?.quickQuestions ?? []).join("\n"),
+  );
   const [ceiling, setCeiling] = useState(String(widget?.dailyCreditCeiling ?? 50_000));
   const [visitorLimit, setVisitorLimit] = useState(String(widget?.visitorHourlyLimit ?? 20));
 
-  const originList = origins
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const originList = splitLines(origins);
+  const questionList = splitLines(quickQuestions).slice(0, 6);
 
   return (
     <DetailSection
@@ -312,25 +318,124 @@ function WidgetForm({
         </p>
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-3">
-        <div className="space-y-2">
-          <Label htmlFor="widget-title">Header</Label>
-          <Input
-            id="widget-title"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-          />
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_auto]">
+        <div>
+          <p className="text-sm font-medium">How it looks</p>
+          <div className="mt-2 grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="widget-title">Header</Label>
+              <Input
+                id="widget-title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="widget-colour">Colour</Label>
+              <Input
+                id="widget-colour"
+                type="color"
+                value={accentColor}
+                onChange={(event) => setAccentColor(event.target.value)}
+                className="h-9 p-1"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="widget-position">Position</Label>
+              <Select
+                value={position}
+                onValueChange={(value) => setPosition(value === "left" ? "left" : "right")}
+              >
+                <SelectTrigger id="widget-position">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="right">Bottom right</SelectItem>
+                  <SelectItem value="left">Bottom left</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="widget-language">Language</Label>
+              <Select
+                value={language}
+                onValueChange={(value) => setLanguage(value === "vi" ? "vi" : "en")}
+              >
+                <SelectTrigger id="widget-language">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="vi">Tiếng Việt</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                The chat&apos;s own words: Send, Searching…; your greeting and questions are
+                whatever you type.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="widget-launcher-label">Button label</Label>
+              <Input
+                id="widget-launcher-label"
+                value={launcherLabel}
+                maxLength={40}
+                placeholder="Ask us"
+                onChange={(event) => setLauncherLabel(event.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Shown beside the chat button. Leave empty for the icon alone.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="widget-placeholder">Placeholder</Label>
+              <Input
+                id="widget-placeholder"
+                value={placeholder}
+                onChange={(event) => setPlaceholder(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-2">
+            <Label htmlFor="widget-greeting">First message</Label>
+            <Textarea
+              id="widget-greeting"
+              value={greeting}
+              rows={2}
+              placeholder="Hi — ask me anything about our products."
+              onChange={(event) => setGreeting(event.target.value)}
+            />
+          </div>
+
+          <div className="mt-4 space-y-2">
+            <Label htmlFor="widget-quick-questions">Quick questions</Label>
+            <Textarea
+              id="widget-quick-questions"
+              value={quickQuestions}
+              rows={3}
+              placeholder={"Where is my order?\nWhat is your return policy?"}
+              onChange={(event) => setQuickQuestions(event.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              One per line. Up to six. Shown as buttons before the visitor types their first
+              message — a good one is the question people ask most.
+            </p>
+          </div>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="widget-colour">Colour</Label>
-          <Input
-            id="widget-colour"
-            type="color"
-            value={accentColor}
-            onChange={(event) => setAccentColor(event.target.value)}
-            className="h-9 p-1"
-          />
-        </div>
+
+        <WidgetPreview
+          title={title}
+          accentColor={accentColor}
+          greeting={greeting}
+          quickQuestions={questionList}
+          placeholder={placeholder}
+          launcherLabel={launcherLabel}
+          position={position}
+        />
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="widget-visitor-limit">Messages per visitor, per hour</Label>
           <Input
@@ -342,34 +447,21 @@ function WidgetForm({
             onChange={(event) => setVisitorLimit(event.target.value)}
           />
         </div>
-      </div>
-
-      <div className="mt-4 space-y-2">
-        <Label htmlFor="widget-greeting">First message</Label>
-        <Textarea
-          id="widget-greeting"
-          value={greeting}
-          rows={2}
-          placeholder="Hi — ask me anything about our products."
-          onChange={(event) => setGreeting(event.target.value)}
-        />
-      </div>
-
-      <div className="mt-4 space-y-2">
-        <Label htmlFor="widget-ceiling">Credits it may spend in a day</Label>
-        <Input
-          id="widget-ceiling"
-          type="number"
-          min={1_000}
-          step={1_000}
-          value={ceiling}
-          onChange={(event) => setCeiling(event.target.value)}
-          className="max-w-48"
-        />
-        <p className="text-xs text-muted-foreground">
-          Its own ceiling, separate from the workspace balance. When it is reached the chat says it
-          is unavailable until tomorrow — which is a bad hour rather than an empty wallet.
-        </p>
+        <div className="space-y-2">
+          <Label htmlFor="widget-ceiling">Credits it may spend in a day</Label>
+          <Input
+            id="widget-ceiling"
+            type="number"
+            min={1_000}
+            step={1_000}
+            value={ceiling}
+            onChange={(event) => setCeiling(event.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Its own ceiling, separate from the workspace balance. When it is reached the chat says
+            it is unavailable until tomorrow — which is a bad hour rather than an empty wallet.
+          </p>
+        </div>
       </div>
 
       <div className="mt-6 flex items-center justify-between gap-3">
@@ -403,6 +495,11 @@ function WidgetForm({
                   greeting: greeting.trim(),
                   accentColor,
                   title: title.trim() || "Chat",
+                  quickQuestions: questionList.map((question) => question.slice(0, 80)),
+                  placeholder: placeholder.trim() || "Type a message…",
+                  launcherLabel: launcherLabel.trim(),
+                  position,
+                  language,
                   dailyCreditCeiling: Number(ceiling) || 50_000,
                   visitorHourlyLimit: Number(visitorLimit) || 20,
                 },
@@ -417,6 +514,14 @@ function WidgetForm({
       </div>
     </DetailSection>
   );
+}
+
+/** One entry per line — how origins and quick questions are typed. */
+function splitLines(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 export function WidgetsLoading() {

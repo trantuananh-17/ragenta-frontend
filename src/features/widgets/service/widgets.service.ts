@@ -26,6 +26,11 @@ export const widgetSchema = z.object({
   greeting: z.string(),
   accentColor: z.string(),
   title: z.string(),
+  quickQuestions: z.array(z.string()),
+  placeholder: z.string(),
+  launcherLabel: z.string(),
+  position: z.enum(["right", "left"]),
+  language: z.enum(["en", "vi"]),
   dailyCreditCeiling: z.number(),
   visitorHourlyLimit: z.number(),
   createdAt: z.coerce.string(),
@@ -48,6 +53,11 @@ export interface SaveWidgetInput {
   greeting: string;
   accentColor: string;
   title: string;
+  quickQuestions: string[];
+  placeholder: string;
+  launcherLabel: string;
+  position: Widget["position"];
+  language: Widget["language"];
   dailyCreditCeiling: number;
   visitorHourlyLimit: number;
 }

@@ -70,6 +70,9 @@ export function ApiConnectionsSection() {
                       <StatusBadge tone="danger">check failed</StatusBadge>
                     )}
                   </p>
+                  {connection.description && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{connection.description}</p>
+                  )}
                   <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                     {connection.baseUrl}
                     {connection.allowedPathPrefix}
@@ -182,6 +185,7 @@ function ConnectionForm({
 
   const [slug, setSlug] = useState(connection?.id ?? "");
   const [name, setName] = useState(connection?.name ?? "");
+  const [description, setDescription] = useState(connection?.description ?? "");
   const [baseUrl, setBaseUrl] = useState(connection?.baseUrl ?? "");
   const [secret, setSecret] = useState("");
   const [authHeader, setAuthHeader] = useState(connection?.authHeader ?? "Authorization");
@@ -230,6 +234,21 @@ function ConnectionForm({
             onChange={(event) => setName(event.target.value)}
           />
         </div>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        <Label htmlFor="conn-description">What is it for?</Label>
+        <Textarea
+          id="conn-description"
+          value={description}
+          rows={2}
+          placeholder="Looks up a customer's orders and delivery status by order number."
+          onChange={(event) => setDescription(event.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Written for the agent, in plain words. It reads this to decide when to call the API —
+          you do not have to mention the connection in the agent&apos;s instructions.
+        </p>
       </div>
 
       <div className="mt-4 space-y-2">
@@ -348,7 +367,7 @@ function ConnectionForm({
                 slug,
                 input: {
                   name: name.trim(),
-                  description: null,
+                  description: description.trim() || null,
                   enabled: connection?.enabled ?? true,
                   baseUrl: baseUrl.trim(),
                   ...(secret.trim() ? { secret: secret.trim() } : {}),

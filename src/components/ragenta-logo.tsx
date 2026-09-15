@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 import { cn } from "@/lib/utils";
 
 /**
@@ -6,10 +8,18 @@ import { cn } from "@/lib/utils";
  * read as one product, so this stays in step with them rather than acquiring its
  * own colour.
  */
-export function RagentaLogoMark({ className }: { className?: string }) {
+export function RagentaLogoMark({
+  className,
+  style,
+}: {
+  className?: string;
+  /** Only the embedded-chat preview tints the mark with a customer's accent. */
+  style?: CSSProperties;
+}) {
   return (
     <span
       aria-hidden
+      style={style}
       className={cn(
         "flex size-6 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground",
         className,
